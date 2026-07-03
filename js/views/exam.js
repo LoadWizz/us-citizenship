@@ -105,6 +105,7 @@ const ExamView = {
         status),
       answerArea
     ));
+    UI.tapGuard(answerArea); // hayalet dokunuş koruması
 
     if (Speech.ttsAvailable) Speech.speak(q.q, { rate: App.settings.ttsRate });
   },
@@ -116,16 +117,27 @@ const ExamView = {
     mic.classList.add("listening");
     Speech.listen({
       onResult: (alts) => {
+        // Yankı koruması: mikrofon sorunun kendisini (TTS/ortam) duyduysa yok say
+        const echo = Speech.compareDictation(q.q, alts[0]);
+        if (echo.ratio > 0.55) {
+          this.state.answeredBySpeech = null;
+          status.innerHTML = "🔁 Sorunun sesi algılandı — soru bittikten sonra 🎤'a basıp CEVABI söyle";
+          status.className = "speech-status";
+          return;
+        }
         const res = Speech.matchAnswer(alts, answers);
-        this.state.answeredBySpeech = { match: res.match, heard: alts[0] };
         if (res.match) {
+          // Sadece gerçek eşleşmede cevap otomatik açılır
+          this.state.answeredBySpeech = { match: true, heard: alts[0] };
           status.innerHTML = `✅ Eşleşti: “${UI.esc(alts[0])}”`;
           status.className = "speech-status ok";
+          this.reveal(q, answers);
         } else {
-          status.innerHTML = `Duyulan: “${UI.esc(alts[0])}” — cevabı göster ve kendin karar ver`;
+          // Eşleşme yok: soru ekranda kalır — tekrar dene veya kendin aç
+          this.state.answeredBySpeech = null;
+          status.innerHTML = `Duyulan: “${UI.esc(alts[0])}” — eşleşmedi. 🎤 ile tekrar dene veya cevabı göster`;
           status.className = "speech-status";
         }
-        this.reveal(q, answers);
       },
       onError: () => { status.textContent = "Ses tanıma çalışmadı — cevabı gösterip kendin işaretle"; mic.classList.remove("listening"); },
       onEnd: () => mic.classList.remove("listening")
@@ -137,6 +149,7 @@ const ExamView = {
     const s = this.state;
     const area = document.getElementById("answer-area");
     area.innerHTML = "";
+    UI.tapGuard(area); // çift dokunuş "Doğru bildim"e kaçmasın
 
     const speech = s.answeredBySpeech;
 

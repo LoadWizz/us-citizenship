@@ -44,6 +44,7 @@ const Speech = (() => {
 
   function listen({ onResult, onError, onEnd }) {
     if (!sttAvailable) { if (onError) onError("unsupported"); return null; }
+    stopSpeaking();   // mikrofon uygulamanın kendi TTS sesini duymasın
     stopListening();
     const rec = new SR();
     rec.lang = "en-US";

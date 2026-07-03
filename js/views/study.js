@@ -82,6 +82,7 @@ const StudyView = {
 
     const revealBtn = h("button", { class: "btn btn-primary btn-big", onclick: () => this.reveal(q, answers) }, "Cevabı Göster");
 
+    const answerArea = h("div", { id: "answer-area" }, revealBtn);
     root.appendChild(h("div", { class: "page" },
       h("div", { class: "study-top" },
         h("button", { class: "btn btn-ghost small-btn", onclick: () => UI.navigate("/home") }, "← Çık"),
@@ -89,8 +90,9 @@ const StudyView = {
         h("span", { style: { width: "52px" } })),
       h("div", { class: "progressbar" }, h("div", { class: "progressbar-fill", style: { width: `${(this.idx / this.queue.length) * 100}%` } })),
       front,
-      h("div", { id: "answer-area" }, revealBtn)
+      answerArea
     ));
+    UI.tapGuard(answerArea); // hayalet dokunuş: önceki ekrandaki tıklama bunu tetiklemesin
 
     if (App.settings.autoTTS && Speech.ttsAvailable) {
       Speech.speak(q.q, { rate: App.settings.ttsRate });
@@ -129,6 +131,7 @@ const StudyView = {
     this.revealed = true;
     const area = document.getElementById("answer-area");
     area.innerHTML = "";
+    UI.tapGuard(area); // "Cevabı Göster"e çift dokunuş notlama butonuna kaçmasın
 
     const grades = [
       { g: 0, label: "Tekrar", sub: "<1dk", cls: "grade-again" },

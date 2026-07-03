@@ -117,5 +117,15 @@ const UI = (() => {
     return new Date(d).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" });
   }
 
-  return { h, esc, toast, register, navigate, renderRoute, openSheet, closeSheet, dynBadge, starBadge, catBadge, progressRing, fmtDate };
+  /* Hayalet dokunuş koruması: yeni çizilen aksiyon alanını kısa süre kilitle.
+   * Bir önceki ekranda aynı noktaya denk gelen dokunuşun ikinci yarısının
+   * yeni butonu tetiklemesini engeller. */
+  function tapGuard(el, ms = 450) {
+    if (!el) return el;
+    el.style.pointerEvents = "none";
+    setTimeout(() => { el.style.pointerEvents = ""; }, ms);
+    return el;
+  }
+
+  return { h, esc, toast, register, navigate, renderRoute, openSheet, closeSheet, dynBadge, starBadge, catBadge, progressRing, fmtDate, tapGuard };
 })();
