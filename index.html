@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>US Citizenship</title>
+  <meta name="description" content="2025 USCIS Vatandaşlık Sınavı hazırlık uygulaması — 128 soru, aralıklı tekrar, sözlü simülasyon">
+  <meta name="theme-color" content="#2563eb">
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="US Citizenship">
+
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <main id="view" aria-live="polite"></main>
+
+  <nav id="nav" aria-label="Ana gezinme">
+    <button class="navbtn" data-route="/home"><span class="nicon">🏠</span>Bugün</button>
+    <button class="navbtn" data-route="/study"><span class="nicon">🃏</span>Çalış</button>
+    <button class="navbtn" data-route="/exam"><span class="nicon">🎓</span>Sınav</button>
+    <button class="navbtn" data-route="/progress"><span class="nicon">📊</span>İlerleme</button>
+    <button class="navbtn" data-route="more"><span class="nicon">☰</span>Daha</button>
+  </nav>
+
+  <div id="sheet-backdrop"></div>
+  <div id="sheet" role="menu">
+    <div class="sheet-handle"></div>
+    <button class="sheet-item" data-route="/english"><span class="nicon">🇬🇧</span>İngilizce Testi</button>
+    <button class="sheet-item" data-route="/interview"><span class="nicon">🗣️</span>Mülakat Hazırlığı</button>
+    <button class="sheet-item" data-route="/settings"><span class="nicon">⚙️</span>Ayarlar</button>
+  </div>
+
+  <!-- Veri -->
+  <script src="js/data.js"></script>
+  <script src="js/english-data.js"></script>
+  <script src="js/interview-data.js"></script>
+  <!-- Çekirdek -->
+  <script src="js/db.js"></script>
+  <script src="js/srs.js"></script>
+  <script src="js/speech.js"></script>
+  <script src="js/coach.js"></script>
+  <script src="js/selfcheck.js"></script>
+  <script src="js/ui.js"></script>
+  <!-- Görünümler -->
+  <script src="js/views/home.js"></script>
+  <script src="js/views/study.js"></script>
+  <script src="js/views/exam.js"></script>
+  <script src="js/views/english.js"></script>
+  <script src="js/views/interview.js"></script>
+  <script src="js/views/progress.js"></script>
+  <script src="js/views/settings.js"></script>
+  <!-- Önyükleme -->
+  <script src="js/app.js"></script>
+</body>
+</html>
