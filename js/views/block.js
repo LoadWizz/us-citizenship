@@ -92,7 +92,17 @@ const BlockTestView = {
 
     /* Soru havuzu */
     let pool;
-    if (mode === "mixed") {
+    if (mode === "drill") {
+      /* 🎯 Zayıflık Drili (Pro): en zayıf 10 soru — hedefli tekrar */
+      const cards = await App.cards();
+      pool = QUESTIONS
+        .map(q => ({ q, w: SRS.weaknessScore(cards.get(q.id)), seen: (cards.get(q.id) || {}).seen || 0 }))
+        .filter(x => x.seen > 0)
+        .sort((a, b) => b.w - a.w)
+        .slice(0, 10)
+        .map(x => x.q);
+      if (pool.length < 3) { UI.toast("Drill için önce biraz çalış — yeterli veri yok"); UI.navigate("/home"); return; }
+    } else if (mode === "mixed") {
       const ids = await Blocks.sealedQuestionIds();
       if (!ids.length) { UI.navigate("/home"); return; }
       const cards = await App.cards();
@@ -120,6 +130,7 @@ const BlockTestView = {
     /* Mühür testi + EN-only mod = salt İngilizce sunum */
     const enOnly = mode === "seal" || !App.isBilingual();
     this.s = { mode, block, pool, idx: 0, correct: 0, wrong: 0, items: [], enOnly, startedAt: Date.now() };
+    this.isPractice = mode === "mixed" || mode === "drill"; // blok durumu değiştirmez
     this.renderQuestion();
   },
 
@@ -139,6 +150,7 @@ const BlockTestView = {
     const natHTML = s.enOnly ? null : Lang.qHTMLNative(q, "tr");
 
     const title = s.mode === "mixed" ? "🔀 Karma Tekrar"
+      : s.mode === "drill" ? "🎯 Zayıflık Drili"
       : s.mode === "seal" ? `🔏 ${s.block.name} — İngilizce Mührü`
       : `📝 ${s.block.name} — Blok Sınavı`;
 
@@ -154,7 +166,7 @@ const BlockTestView = {
         h("span", { class: "muted small" }, title),
         h("span", { class: "muted" }, `${s.idx + 1}/${s.pool.length}`)),
       h("div", { class: "progressbar" }, h("div", { class: "progressbar-fill", style: { width: `${(s.idx / s.pool.length) * 100}%` } })),
-      s.mode !== "mixed" ? h("div", { class: "score-strip" },
+      !this.isPractice ? h("div", { class: "score-strip" },
         h("span", { class: "ok" }, `✓ ${s.correct}`),
         h("span", { class: "muted" }, `eşik: ${Blocks.passNeed(s.pool.length)}`),
         h("span", { class: "fail" }, `✗ ${s.wrong}`)) : null,
@@ -263,10 +275,10 @@ const BlockTestView = {
 
     await DB.addExam({
       date: new Date().toISOString(),
-      type: s.mode === "mixed" ? "mixed" : (s.mode === "seal" || !App.isBilingual() ? "seal" : "block"),
+      type: this.isPractice ? s.mode : (s.mode === "seal" || !App.isBilingual() ? "seal" : "block"),
       blockId: s.block ? s.block.id : null,
       score: s.correct, wrong: s.wrong, total, asked: total,
-      passed: s.mode === "mixed" ? null : ok,
+      passed: this.isPractice ? null : ok,
       items: s.items,
       durationSec: Math.round((Date.now() - s.startedAt) / 1000)
     });
@@ -278,14 +290,15 @@ const BlockTestView = {
     const wrongItems = s.items.filter(i => !i.correct);
 
     root.appendChild(h("div", { class: "page" },
-      h("div", { class: `result-banner ${s.mode === "mixed" ? "" : (ok ? "pass" : "fail-bg")}` },
-        h("div", { class: "big-emoji" }, s.mode === "mixed" ? "🔀" : (sealedNow ? "🏅" : ok ? "🎉" : "💪")),
+      h("div", { class: `result-banner ${this.isPractice ? "" : (ok ? "pass" : "fail-bg")}` },
+        h("div", { class: "big-emoji" }, s.mode === "mixed" ? "🔀" : s.mode === "drill" ? "🎯" : (sealedNow ? "🏅" : ok ? "🎉" : "💪")),
         h("h1", {}, s.mode === "mixed" ? "Karma tekrar bitti"
+          : s.mode === "drill" ? "Drill bitti"
           : sealedNow ? "MÜHÜRLENDİ!"
           : ok ? (s.mode === "seal" ? "MÜHÜRLENDİ!" : "GEÇTİN!") : "OLMADI"),
         h("p", { class: "result-score" }, `${s.correct}/${total} doğru`,
-          s.mode !== "mixed" ? ` · eşik ${need}` : ""),
-        s.mode !== "mixed" && !ok ? h("p", { class: "small" },
+          !this.isPractice ? ` · eşik ${need}` : ""),
+        !this.isPractice && !ok ? h("p", { class: "small" },
           `${need - s.correct} doğru daha gerekiyordu. Yanlışların çalışma kuyruğuna eklendi — kısa bir tekrar sonrası yeniden dene (sorular her seferinde karışır).`) : null,
         unlockedNext && nextBlock ? h("p", { class: "unlock-note" }, `🔓 Blok ${nextBlock.id} açıldı: ${nextBlock.icon} ${nextBlock.name}`) : null,
         (ok && s.mode === "test" && App.isBilingual() && !sealedNow) ? h("p", { class: "small" },
@@ -303,7 +316,7 @@ const BlockTestView = {
       (ok && s.mode === "test" && App.isBilingual() && !sealedNow)
         ? h("button", { class: "btn btn-seal btn-big", onclick: () => { App.testMode = "seal"; this.render(this.root); } }, "🔏 İngilizce Mührü'ne Geç")
         : null,
-      (!ok && s.mode !== "mixed")
+      (!ok && !this.isPractice)
         ? h("button", { class: "btn btn-primary btn-big", onclick: () => this.render(this.root) }, "🔄 Tekrar Dene (karışık sıra)")
         : null,
       (sealedNow && nextBlock)

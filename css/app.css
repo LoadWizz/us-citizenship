@@ -442,3 +442,56 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 /* ---------- kilitli özellik teaser ---------- */
 .locked-teaser { cursor: pointer; border: 1.5px dashed var(--accent); }
+
+/* =========================================================================
+ * FAZ B EKLERİ — paywall / plan kartları
+ * ========================================================================= */
+.pay-hero { text-align: center; padding: 8px 4px; }
+.pay-progress { font-weight: 700; margin: 8px 0 6px; }
+.pay-hero .progressbar { max-width: 260px; margin: 0 auto 10px; }
+
+.interval-toggle {
+  display: flex; background: var(--ring-bg); border-radius: 12px; padding: 4px; gap: 4px;
+}
+.int-btn {
+  flex: 1; border: none; border-radius: 9px; padding: 10px 8px;
+  background: transparent; color: var(--muted);
+  font-family: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  min-height: 44px;
+}
+.int-active { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+.save-tag {
+  display: inline-block; margin-left: 6px; font-size: 0.62rem; font-weight: 800;
+  background: rgba(22,163,74,0.16); color: var(--ok);
+  border-radius: 999px; padding: 2px 7px; vertical-align: middle;
+}
+
+#plan-cards { display: flex; flex-direction: column; gap: 14px; }
+.plan-card {
+  position: relative; background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 18px; padding: 18px 16px 16px;
+  box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.plan-popular { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
+.pop-badge {
+  position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #fff;
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em;
+  border-radius: 999px; padding: 4px 12px;
+}
+.plan-name { font-size: 1.15rem; font-weight: 800; }
+.plan-price { font-size: 1.9rem; font-weight: 800; margin-top: 2px; }
+.plan-per { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.plan-subline { margin-top: -2px; }
+.plan-feats { margin: 8px 0 10px; padding-left: 20px; }
+.plan-feats li { margin: 4px 0; font-size: 0.88rem; }
+.trust-row { text-align: center; }
+
+/* faturalama/durum banner'ları (Faz D) */
+.banner {
+  border-radius: 12px; padding: 10px 14px; font-size: 0.88rem; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.banner-warn { background: var(--warn-bg); color: var(--warn-text); }
+.banner-err  { background: rgba(220,38,38,0.12); color: var(--fail); }

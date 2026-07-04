@@ -84,16 +84,19 @@ const HomeView = {
 
       h("div", { class: "row-btns" },
         h("button", { class: "btn btn-outline", onclick: () => UI.navigate("/exam") }, "🎓 Deneme Sınavı"),
-        (typeof Entitlements === "undefined" || Entitlements.has("full_blocks"))
-          ? h("button", {
-              class: "btn btn-outline",
-              onclick: async () => {
-                const pool = await Blocks.sealedQuestionIds();
-                if (!pool.length) { UI.toast("Önce en az bir bloğu mühürle"); return; }
-                App.testMode = "mixed"; UI.navigate("/blocktest");
-              }
-            }, "🔀 Karma Tekrar")
-          : null)
+        h("button", {
+          class: "btn btn-outline",
+          onclick: async () => {
+            const pool = await Blocks.sealedQuestionIds();
+            if (!pool.length) { UI.toast("Önce en az bir bloğu mühürle"); return; }
+            App.testMode = "mixed"; UI.navigate("/blocktest");
+          }
+        }, "🔀 Karma Tekrar")),
+
+      (typeof Entitlements !== "undefined" && Entitlements.has("weakness_drill"))
+        ? h("button", { class: "btn btn-outline", onclick: () => { App.testMode = "drill"; UI.navigate("/blocktest"); } },
+            "🎯 Zayıflık Drili (en zayıf 10 sorun)")
+        : null
     ));
   }
 };

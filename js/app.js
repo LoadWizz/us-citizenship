@@ -161,6 +161,17 @@ const App = {
   async boot() {
     await this.loadSettings();
     this.applyTheme();
+
+    /* Yetkilendirme: son bilineni yükle → checkout dönüşü varsa işle →
+     * arka planda backend doğrulaması (çevrimdışıysa grace penceresi korur) */
+    if (typeof Entitlements !== "undefined") {
+      await Entitlements.load();
+      if (typeof Payments !== "undefined") {
+        try { await Payments.handleReturn(); } catch (_) {}
+      }
+      Entitlements.verifyWithBackend(); // beklemeden — sonuç state'i günceller
+    }
+
     this.selfCheck = SelfCheck.run();
     if (!this.selfCheck.allPass) {
       UI.toast("⚠️ Veri doğrulama uyarısı — Ayarlar'a bak");
