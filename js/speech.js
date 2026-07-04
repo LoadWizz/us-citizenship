@@ -63,6 +63,30 @@ const Speech = (() => {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
   const sttAvailable = !!SR;
   let activeRec = null;
+  let micBlocked = false;      // izin reddedildi → bu oturumda 🎤 gizlenir
+  let sttFailCount = 0;        // art arda teknik hata → destek yok kabul et
+
+  /* Mikrofon kullanılabilir mi? (API var + izin reddedilmedi + 3 kez üst üste çakılmadı) */
+  function micUsable() { return sttAvailable && !micBlocked && sttFailCount < 3; }
+
+  /* Hata kodu → kullanıcıya net Türkçe açıklama */
+  function sttErrorMessage(err) {
+    switch (err) {
+      case "not-allowed":
+      case "service-not-allowed":
+        return "🎤 Mikrofon izni reddedilmiş. Tarayıcı Ayarları > Site izinleri > Mikrofon'dan izin ver, sonra sayfayı yenile.";
+      case "network":
+        return "Ses tanıma servisi ağa ulaşamadı — internet bağlantını kontrol et. (Samsung Internet kullanıyorsan: ses tanıma orada yok, uygulamayı Chrome ile aç.)";
+      case "no-speech":
+        return "Ses algılanamadı — 🎤'a bastıktan sonra cevabı yüksek sesle söyle.";
+      case "audio-capture":
+        return "Mikrofon bulunamadı — başka bir uygulama kullanıyor olabilir.";
+      case "unsupported":
+        return "Bu tarayıcı ses tanımayı desteklemiyor. En iyi deneyim: Android'de Chrome, iPhone'da Safari.";
+      default:
+        return "Ses tanıma çalışmadı — cevabı gösterip kendin işaretleyebilirsin.";
+    }
+  }
 
   function listen({ onResult, onError, onEnd }) {
     if (!sttAvailable) { if (onError) onError("unsupported"); return null; }
@@ -75,9 +99,14 @@ const Speech = (() => {
     rec.onresult = (e) => {
       const alts = [];
       for (let i = 0; i < e.results[0].length; i++) alts.push(e.results[0][i].transcript);
+      sttFailCount = 0; // çalıştı — hata sayacını sıfırla
       if (onResult) onResult(alts);
     };
-    rec.onerror = (e) => { if (onError) onError(e.error); };
+    rec.onerror = (e) => {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") micBlocked = true;
+      else if (e.error !== "no-speech" && e.error !== "aborted") sttFailCount++;
+      if (onError) onError(e.error);
+    };
     rec.onend = () => { activeRec = null; if (onEnd) onEnd(); };
     activeRec = rec;
     rec.start();
@@ -157,5 +186,5 @@ const Speech = (() => {
     return { words: result, extra: t.length - e.length, ratio: e.length ? correct / e.length : 0 };
   }
 
-  return { ttsAvailable, sttAvailable, hasVoice, speak, speakSequence, stopSpeaking, listen, stopListening, normalize, matchAnswer, compareDictation };
+  return { ttsAvailable, sttAvailable, micUsable, sttErrorMessage, hasVoice, speak, speakSequence, stopSpeaking, listen, stopListening, normalize, matchAnswer, compareDictation };
 })();

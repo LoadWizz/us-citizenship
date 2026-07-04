@@ -94,7 +94,7 @@ const StudyView = {
       h("div", { class: `qtext ${natHTML ? "qtext-en-second" : ""}`, lang: "en", html: Lang.qHTMLEn(q) }),
       h("div", { class: "qcontrols" },
         Speech.ttsAvailable ? h("button", { class: "btn btn-circle", title: "Soruyu dinle", onclick: () => this.speakQuestion(q) }, "🔊") : null,
-        Speech.sttAvailable ? h("button", { class: "btn btn-circle", id: "mic-btn", title: "İngilizce sesli cevapla", onclick: () => this.listenAnswer(q, answers) }, "🎤") : null),
+        Speech.micUsable() ? h("button", { class: "btn btn-circle", id: "mic-btn", title: "İngilizce sesli cevapla", onclick: () => this.listenAnswer(q, answers) }, "🎤") : null),
       speechStatus
     );
 
@@ -150,33 +150,41 @@ const StudyView = {
         }
       },
       onError: (err) => {
-        status.textContent = err === "not-allowed"
-          ? "Mikrofon izni verilmedi — dokunarak devam et"
-          : "Ses tanıma çalışmadı — dokunarak devam et";
+        status.textContent = Speech.sttErrorMessage(err);
         mic.classList.remove("listening");
+        if (!Speech.micUsable()) mic.style.display = "none"; // izin yok → butonu kaldır
       },
       onEnd: () => { const m = document.getElementById("mic-btn"); if (m) m.classList.remove("listening"); }
     });
   },
 
-  reveal(q, answers) {
+  async reveal(q, answers) {
     const { h } = UI;
     const area = document.getElementById("answer-area");
     area.innerHTML = "";
     UI.tapGuard(area);
 
     const pairs = Lang.answerPairs(q, App.settings.officials, App.nativeLang());
+    const hasBest = pairs.some(p => p.best);
+    /* Not butonlarında GERÇEK süreler: bu kart için her notun kartı ne zaman
+     * geri getireceği hesaplanır ("kısa/uzun" yerine somut bilgi) */
+    const cardState = (await App.cards()).get(q.id) || SRS.newCard(q.id);
+    const ivs = SRS.previewIntervals(cardState);
     const grades = [
-      { g: 0, label: "Tekrar", sub: "<1dk", cls: "grade-again" },
-      { g: 1, label: "Zor", sub: "kısa", cls: "grade-hard" },
-      { g: 2, label: "İyi", sub: "normal", cls: "grade-good" },
-      { g: 3, label: "Kolay", sub: "uzun", cls: "grade-easy" }
+      { g: 0, label: "Tekrar", sub: SRS.fmtInterval(ivs[0]), cls: "grade-again" },
+      { g: 1, label: "Zor", sub: SRS.fmtInterval(ivs[1]), cls: "grade-hard" },
+      { g: 2, label: "İyi", sub: SRS.fmtInterval(ivs[2]), cls: "grade-good" },
+      { g: 3, label: "Kolay", sub: SRS.fmtInterval(ivs[3]), cls: "grade-easy" }
     ];
 
     area.appendChild(h("div", { class: "card acard" },
-      h("div", { class: "alabel" }, "Kabul edilen cevap(lar):"),
+      h("div", { class: "alabel" }, hasBest ? "Kabul edilen cevaplar — renkli olanı ezberle:" : "Kabul edilen cevap(lar):"),
       h("ul", { class: "alist" }, pairs.map(p =>
-        h("li", { lang: "en" }, p.en,
+        h("li", { lang: "en", class: p.best ? "a-best-li" : "" },
+          p.best
+            ? h("span", { class: `a-best cue-${q.cat}` }, p.en)
+            : p.en,
+          p.best ? h("span", { class: "best-tag" }, "en kolayı") : null,
           p.nat ? h("div", { class: "a-nat", lang: "tr" }, p.nat) : null))),
       q.note ? h("div", { class: "anote muted small" }, "ℹ️ " + q.note) : null,
       h("div", { class: "trbox" },
@@ -184,6 +192,24 @@ const StudyView = {
         h("div", { class: "tr-hook" }, "🧠 " + q.hook)),
       this.lastSpeechMatch === true ? h("div", { class: "speech-status ok" }, "🎤 Sesli cevabın eşleşmişti — 'İyi' veya 'Kolay' seç") : null
     ));
+
+    /* İlk kullanımda not butonlarının ne işe yaradığını TEK SEFER anlat */
+    if (!App.settings.gradeHelpSeen) {
+      const helpCard = h("div", { class: "card grade-help" },
+        h("b", {}, "Bu 4 düğme ne işe yarar?"),
+        h("p", { class: "small", style: { margin: "6px 0" } },
+          "Ne kadar iyi bildiğini SEN söylersin; uygulama kartı ona göre tam zamanında tekrar sorar (unutma eğrisi bilimi). Düğmenin altındaki süre = kartın ne zaman geri geleceği."),
+        h("ul", { class: "small", style: { margin: "0 0 8px", paddingLeft: "18px" } },
+          h("li", {}, h("b", {}, "Tekrar"), " — bilemedim, birazdan yine sor"),
+          h("li", {}, h("b", {}, "Zor"), " — bildim ama zorlandım"),
+          h("li", {}, h("b", {}, "İyi"), " — normal hatırladım (çoğu zaman bu)"),
+          h("li", {}, h("b", {}, "Kolay"), " — anında bildim, uzun süre sorma")),
+        h("button", {
+          class: "btn btn-primary small-btn", style: { width: "auto" },
+          onclick: async () => { App.settings.gradeHelpSeen = true; await App.saveSettings(); helpCard.remove(); }
+        }, "Anladım 👍"));
+      area.appendChild(helpCard);
+    }
 
     area.appendChild(h("div", { class: "grade-row" },
       grades.map(x => h("button", {
@@ -203,8 +229,8 @@ const StudyView = {
     if (Speech.ttsAvailable) {
       area.appendChild(h("button", {
         class: "btn btn-ghost", style: { marginTop: "8px" },
-        onclick: () => Speech.speak(answers.join(". "), { lang: "en", rate: App.settings.ttsRate })
-      }, "🔊 Cevabı dinle (İngilizce)"));
+        onclick: () => Speech.speak(Lang.speakableAnswers(q, App.settings.officials).join(". "), { lang: "en", rate: App.settings.ttsRate })
+      }, hasBest ? "🔊 En kolay cevabı dinle" : "🔊 Cevabı dinle (İngilizce)"));
     }
   }
 };

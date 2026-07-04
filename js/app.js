@@ -17,7 +17,8 @@ const App = {
     realisticExam: true,   // 12 doğru / 9 yanlışta erken bitir
     theme: "auto",         // auto | light | dark
     apiKey: "",
-    coachModel: "claude-sonnet-4-6"
+    coachModel: "claude-sonnet-4-6",
+    gradeHelpSeen: false   // not butonları açıklaması bir kez gösterilir
   },
 
   /* Bilingual mod aktif mi? (İspanyolca eklenince "es" de bilingual sayılır) */

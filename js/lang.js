@@ -55,17 +55,28 @@ const Lang = (() => {
     return highlight(n.q, n.cue, q.cat);
   }
 
-  /* Cevap çiftleri: [{en, nat|null}] — EN her zaman esas (sınav dili).
-   * nat yalnızca paket dizisi EN diziyle paralelse eşlenir. */
+  /* Cevap çiftleri: [{en, nat|null, best}] — EN her zaman esas (sınav dili).
+   * nat yalnızca paket dizisi EN diziyle paralelse eşlenir.
+   * best: bu cevap "en kolay ezber seti"nde (best.js küratörlüğü) —
+   * yalnız çok cevaplı sorularda işaretlenir, renkli vurgulanır. */
   function answerPairs(q, officials, code) {
     const en = effectiveAnswers(q, officials);
     const n = code ? native(q, code) : null;
     const natArr = (n && Array.isArray(n.a) && !q.pers && n.a.length === q.a.length) ? n.a : null;
+    const bestIdx = (typeof BEST_ANSWERS !== "undefined" && !q.pers) ? BEST_ANSWERS[q.id] || null : null;
     return en.map((ans, i) => ({
       en: ans,
-      nat: natArr && q.a[i] === ans ? natArr[i] : null
+      nat: natArr && q.a[i] === ans ? natArr[i] : null,
+      best: !!(bestIdx && q.a[i] === ans && bestIdx.includes(i))
     }));
   }
 
-  return { pack, native, highlight, qHTMLEn, qHTMLNative, answerPairs, esc };
+  /* Sesli okumada önce ezber seti: önerilen cevap(lar) varsa onları oku */
+  function speakableAnswers(q, officials) {
+    const pairs = answerPairs(q, officials, null);
+    const best = pairs.filter(p => p.best).map(p => p.en);
+    return best.length ? best : pairs.map(p => p.en);
+  }
+
+  return { pack, native, highlight, qHTMLEn, qHTMLNative, answerPairs, speakableAnswers, esc };
 })();

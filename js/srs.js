@@ -93,6 +93,43 @@ const SRS = (() => {
     return 4;                                                       // oturmuş
   }
 
+  /* Not butonları için süre önizlemesi: her not (0-3) seçilirse kartın
+   * yaklaşık ne zaman geri geleceği (fuzz'sız). Kullanıcıya "kısa/uzun"
+   * yerine somut süre göstermek için. */
+  function previewIntervals(card, now = Date.now()) {
+    const out = [];
+    for (let g = 0; g <= 3; g++) {
+      const c = { ...card };
+      let due;
+      if (g === 0) due = now + LEARNING_STEPS_MS[0];
+      else if (c.state !== "review") {
+        if (g === 1) due = now + LEARNING_STEPS_MS[Math.min(c.step || 0, LEARNING_STEPS_MS.length - 1)];
+        else if (g === 2) {
+          const step = (c.state === "new") ? 1 : (c.step || 0) + 1;
+          due = step >= LEARNING_STEPS_MS.length ? now + DAY : now + LEARNING_STEPS_MS[step];
+        } else due = now + 3 * DAY;
+      } else {
+        let iv;
+        if (g === 1) iv = Math.max(1, c.interval * 1.2);
+        else if (g === 2) iv = Math.max(1, c.interval * c.ease);
+        else iv = Math.max(2, c.interval * c.ease * 1.3);
+        due = now + Math.min(MAX_INTERVAL_DAYS, iv) * DAY;
+      }
+      out.push(due - now);
+    }
+    return out;
+  }
+
+  function fmtInterval(ms) {
+    const min = ms / 60000;
+    if (min < 60) return `${Math.max(1, Math.round(min))} dk`;
+    const hr = min / 60;
+    if (hr < 48) return `${Math.round(hr)} sa`;
+    const d = hr / 24;
+    if (d < 30) return `${Math.round(d)} gün`;
+    return `${Math.round(d / 30)} ay`;
+  }
+
   /* Successive relearning kriteri (Rawson & Dunlosky 2011):
    * soru FARKLI İKİ GÜNDE İngilizce modda doğru cevaplanmışsa ustalaşmıştır.
    * enCorrectDays: ["YYYY-MM-DD", ...] — App.gradeCard EN modunda doldurur. */
@@ -108,5 +145,5 @@ const SRS = (() => {
     return wrongRate * 2 + lapsePenalty;
   }
 
-  return { newCard, grade, isDue, masteryLevel, isMastered, weaknessScore, MATURE_DAYS };
+  return { newCard, grade, isDue, masteryLevel, isMastered, weaknessScore, previewIntervals, fmtInterval, MATURE_DAYS };
 })();

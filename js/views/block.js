@@ -157,8 +157,8 @@ const BlockTestView = {
     const status = h("div", { class: "speech-status", id: "speech-status" });
     const answerArea = h("div", { id: "answer-area" },
       h("div", { class: "exam-btns" },
-        Speech.sttAvailable ? h("button", { class: "btn btn-primary btn-big", id: "mic-btn", onclick: () => this.listen(q, answers) }, "🎤 Sesli Cevapla") : null,
-        h("button", { class: "btn btn-outline btn-big", onclick: () => this.reveal(q, answers) }, "Cevabı Göster")));
+        Speech.micUsable() ? h("button", { class: "btn btn-primary btn-big", id: "mic-btn", onclick: () => this.listen(q, answers) }, "🎤 Sesli Cevapla") : null,
+        h("button", { class: Speech.micUsable() ? "btn btn-outline btn-big" : "btn btn-primary btn-big", onclick: () => this.reveal(q, answers) }, "Cevabı Göster")));
 
     root.appendChild(h("div", { class: "page" },
       h("div", { class: "study-top" },
@@ -219,7 +219,11 @@ const BlockTestView = {
           status.innerHTML = `Duyulan: “${UI.esc(alts[0])}” — eşleşmedi. Tekrar dene veya cevabı göster`;
         }
       },
-      onError: () => { status.textContent = "Ses tanıma çalışmadı — cevabı göster"; mic.classList.remove("listening"); },
+      onError: (err) => {
+        status.textContent = Speech.sttErrorMessage(err);
+        mic.classList.remove("listening");
+        if (!Speech.micUsable()) mic.style.display = "none";
+      },
       onEnd: () => { const m = document.getElementById("mic-btn"); if (m) m.classList.remove("listening"); }
     });
   },
@@ -232,10 +236,14 @@ const BlockTestView = {
     UI.tapGuard(area);
 
     const pairs = Lang.answerPairs(q, App.settings.officials, s.enOnly ? null : App.nativeLang());
+    const hasBest = pairs.some(p => p.best);
     area.appendChild(h("div", { class: "card acard" },
-      h("div", { class: "alabel" }, "Kabul edilen cevap(lar):"),
+      h("div", { class: "alabel" }, hasBest ? "Kabul edilen cevaplar — renkli olanı ezberle:" : "Kabul edilen cevap(lar):"),
       h("ul", { class: "alist" }, pairs.map(p =>
-        h("li", { lang: "en" }, p.en, p.nat ? h("div", { class: "a-nat", lang: "tr" }, p.nat) : null))),
+        h("li", { lang: "en", class: p.best ? "a-best-li" : "" },
+          p.best ? h("span", { class: `a-best cue-${q.cat}` }, p.en) : p.en,
+          p.best ? h("span", { class: "best-tag" }, "en kolayı") : null,
+          p.nat ? h("div", { class: "a-nat", lang: "tr" }, p.nat) : null))),
       s.speechMatch ? h("div", { class: "speech-status ok" }, "🎤 Sesli cevabın kabul edildi") : null));
 
     const mark = async (correct) => {

@@ -70,6 +70,19 @@ const SelfCheck = (() => {
     }
     ok("TR paketi tam (soru+ipucu+paralel cevaplar)", trFail.length === 0, trFail.slice(0, 8).join(","));
 
+    /* ---------- 3b) "En kolay cevap" küratörlüğü ---------- */
+    let bestFail = [];
+    for (const q of QUESTIONS) {
+      const b = BEST_ANSWERS[q.id];
+      const multi = q.a.length > 1 && !q.pers;
+      if (multi && !b) bestFail.push(q.id + ":eksik");
+      if (!multi && b) bestFail.push(q.id + ":gereksiz");
+      if (b && (!Array.isArray(b) || b.some(i => !Number.isInteger(i) || i < 0 || i >= q.a.length)))
+        bestFail.push(q.id + ":indeks");
+      if (b && new Set(b).size !== b.length) bestFail.push(q.id + ":tekrar");
+    }
+    ok("En kolay cevap seti tam ve geçerli (çok cevaplı 128 alt kümesi)", bestFail.length === 0, bestFail.slice(0, 8).join(","));
+
     /* ---------- 4) Kategori aralıkları ---------- */
     const catCheck =
       QUESTIONS.slice(0, 15).every(q => q.cat === "GOV_A") &&

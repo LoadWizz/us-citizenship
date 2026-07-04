@@ -495,3 +495,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 }
 .banner-warn { background: var(--warn-bg); color: var(--warn-text); }
 .banner-err  { background: rgba(220,38,38,0.12); color: var(--fail); }
+
+/* ---------- en kolay cevap vurgusu + not yardımı ---------- */
+.a-best { font-weight: 800; border-radius: 6px; padding: 1px 5px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.a-best-li { list-style-type: "👉 "; margin-left: 2px; }
+.best-tag {
+  display: inline-block; margin-left: 6px; vertical-align: middle;
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.03em;
+  background: var(--ok); color: #fff; border-radius: 999px; padding: 2px 7px;
+}
+.grade-help { border: 1.5px dashed var(--accent); margin-top: 10px; }
