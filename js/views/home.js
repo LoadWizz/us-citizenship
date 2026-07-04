@@ -48,10 +48,22 @@ const HomeView = {
         h("div", { class: "block-chev" }, "›"));
     });
 
+    /* faturalama uyarı banner'ları (dunning / grace) */
+    const ent = (typeof Entitlements !== "undefined") ? Entitlements.current() : null;
+    const billingBanner =
+      ent && ent.status === "past_due"
+        ? h("div", { class: "banner banner-err", onclick: () => UI.navigate("/billing"), style: { cursor: "pointer" } },
+            "💳 Ödemen alınamadı — kartını güncelle ki erişimin kesilmesin. Dokun →")
+        : ent && Entitlements.inGrace(ent)
+          ? h("div", { class: "banner banner-warn", onclick: () => UI.navigate("/billing"), style: { cursor: "pointer" } },
+              "⏳ Abonelik doğrulanamadı (çevrimdışı?) — 7 günlük hoşgörü penceresindesin")
+          : null;
+
     root.appendChild(h("div", { class: "page" },
       h("div", { class: "hero" },
         h("h1", {}, "🇺🇸 US Citizenship"),
         h("p", { class: "sub" }, "2025 sınavı · 20 soruda 12 doğru = geçer · test sözlü ve İngilizce")),
+      billingBanner,
 
       h("div", { class: "card stat-row" },
         h("div", { class: "stat" },

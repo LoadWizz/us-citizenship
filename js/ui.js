@@ -63,7 +63,7 @@ const UI = (() => {
     document.querySelectorAll(".navbtn").forEach(b => {
       const r = b.getAttribute("data-route");
       const isMore = r === "more";
-      const moreRoutes = ["/english", "/interview", "/settings"];
+      const moreRoutes = ["/english", "/interview", "/settings", "/billing", "/paywall"];
       b.classList.toggle("active", r === path || (isMore && moreRoutes.includes(path)));
     });
     closeSheet();

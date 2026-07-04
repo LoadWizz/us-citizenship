@@ -1,16 +1,46 @@
-# 🇺🇸 US Citizenship — 2025 Vatandaşlık Sınavı Hazırlık PWA
+# 🇺🇸 US Citizenship — 2025 Vatandaşlık Sınavı Hazırlık PWA (Prod)
 
 2025 USCIS Naturalizasyon Yurttaşlık Testi (128 soru; 20 sorudan **12 doğru = geçer**; test **sözlü**) için
-tamamen çevrimdışı çalışan, telefona kurulabilen mobil çalışma uygulaması.
-Sorular/cevaplar İngilizce (sınav İngilizce), tüm arayüz ve açıklamalar Türkçe.
+tamamen çevrimdışı çalışan, telefona kurulabilen, **freemium abonelikli** mobil çalışma uygulaması.
+Sorular/cevaplar İngilizce (sınav İngilizce); arayüz Türkçe; iki dilli öğrenme modu.
 
+**Canlı:** https://loadwizz.github.io/us-citizenship
 **Kaynak:** `2025-Civics-Test-128-Questions-and-Answers.pdf` (USCIS M-1778, 09/25) — bu klasörde.
+**Metodoloji kanıtları:** [METHODOLOGY.md](METHODOLOGY.md) · **Canlıya alma:** [MORNING-CHECKLIST.md](MORNING-CHECKLIST.md) · **Mağaza yolu:** [STORE.md](STORE.md)
 
-## Çalıştırma (tek satır)
+## Çalıştırma
 
 ```bash
+# Frontend (tek satır)
 cd ~/us-citizenship && python3 -m http.server 8000
+# Ödeme backend'i (ayrı terminal — MOCK modda Stripe anahtarsız çalışır)
+node backend/local-server.mjs
 ```
+
+## v2 Mimarisi — öğrenme sistemi
+
+- **7 blok + iki kapılı mühür:** Blok 1 = resmi ★yıldızlı 20 (ücretsiz). Blok
+  sınavı ≥%85 → **İngilizce Mührü** ≥%85 → sonraki blok açılır (Bloom mastery
+  + transfer-appropriate processing; deneme/mühür daima salt İngilizce).
+- **Benzersiz renkli ipucu:** 128 sorunun her birinde, soruyu bankada benzersiz
+  kılan anlamlı öbek vurgulu ("supreme" değil "law of the land" — cue overload
+  ilkesi). `js/cues.js` elle küre edildi, selfcheck programatik doğrular.
+- **İki dilli mod:** soru önce Türkçe sonra İngilizce (görsel+sesli); cevaplar
+  EN esaslı + TR karşılık. İspanyolca için paket mimarisi hazır (`js/lang.js`).
+- **Ustalık:** soru, FARKLI İKİ GÜNDE İngilizce doğru cevaplanınca "ustalaşıldı"
+  (successive relearning). Karma Tekrar mühürlü bloklardan karışık sorar (interleaving).
+
+## v2 Mimarisi — gelir sistemi
+
+- **Planlar** (`js/pricing.js`, davranışsal gerekçeler dosyada): Ücretsiz (Blok 1)
+  · Hazırlık $8.99/ay–$49.99/yıl · Vatandaşlık $14.99/ay–$79.99/yıl (AI Koç +
+  Zayıflık Drili) · Ömür Boyu $129.
+- **Entitlement seam** (`js/entitlements.js`): Stripe aktif; Apple/Google IAP
+  stub'ları aynı kilide takılır (mağaza sürümleri için). 7 gün çevrimdışı grace.
+- **Backend** (`backend/`): Cloudflare Worker (sıfır bağımlılık) — checkout,
+  webhook (imza doğrulamalı), session-status, verify (JWT), restore, portal.
+  `local-server.mjs` aynı worker'ı Node'da MOCK Stripe ile koşar: anahtarsız
+  uçtan uca test. Gerçek anahtarlar yalnız `.env`/wrangler secret (repoda YOK).
 
 Sonra tarayıcıda: **http://localhost:8000**
 

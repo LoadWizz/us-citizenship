@@ -35,8 +35,29 @@ const SettingsView = {
 
     const sc = App.selfCheck;
 
+    /* Geliştirici bölümü: başlığa 7 kez dokununca görünür (yalnız test) */
+    let titleTaps = 0;
+    const devCard = h("div", { class: "card", id: "dev-card", style: { display: App._devVisible ? "" : "none" } },
+      h("h3", {}, "🛠️ Geliştirici (yalnız test)"),
+      h("label", { class: "field" },
+        h("span", { class: "field-label" }, "Backend URL"),
+        h("input", {
+          type: "text", class: "input", value: s.backendUrl || PRICING.defaultBackendUrl,
+          onchange: async (e) => { s.backendUrl = e.target.value.trim(); await App.saveSettings(); UI.toast("Backend güncellendi"); }
+        })),
+      h("div", { class: "row-btns" },
+        h("button", { class: "btn btn-outline small-btn", onclick: async () => { await Entitlements.devUnlock("prep"); UI.toast("DEV: prep açık"); } }, "DEV: Prep"),
+        h("button", { class: "btn btn-outline small-btn", onclick: async () => { await Entitlements.devUnlock("pro"); UI.toast("DEV: pro açık"); } }, "DEV: Pro"),
+        h("button", { class: "btn btn-outline small-btn", onclick: async () => { await Entitlements.clear(); UI.toast("Entitlement temizlendi"); } }, "Temizle")),
+      h("p", { class: "small muted" }, "Bu bölüm üretim kullanıcısına kapalıdır; başlığa 7 dokunuşla açılır ve yalnız test içindir."));
+
     root.appendChild(h("div", { class: "page" },
-      h("h1", {}, "⚙️ Ayarlar"),
+      h("h1", {
+        onclick: () => {
+          titleTaps++;
+          if (titleTaps >= 7) { App._devVisible = true; devCard.style.display = ""; UI.toast("🛠️ Geliştirici modu görünür"); }
+        }
+      }, "⚙️ Ayarlar"),
 
       h("div", { class: "card" },
         h("h3", {}, "🏛️ Güncel Yetkililer"),
@@ -128,9 +149,15 @@ const SettingsView = {
           `${r.pass ? "✓" : "✗"} ${r.name}${r.detail ? " — " + r.detail : ""}`)),
         h("p", { class: "small muted" }, `Yıldızlı 20 soru: ${STAR_IDS.join(", ")}`)),
 
+      devCard,
+
       h("div", { class: "card small muted" },
         h("p", {}, "Kaynak: USCIS M-1778 (09/25) — 128 Civics Questions and Answers, 2025 version."),
-        h("p", {}, "Bu uygulama resmi bir USCIS ürünü değildir; çalışma yardımcısıdır."))
+        h("p", {}, "Bu uygulama resmi bir USCIS ürünü değildir; çalışma yardımcısıdır."),
+        h("p", {}, "© Ardaluna Holding LLC · ",
+          h("a", { href: "legal/terms.html", target: "_blank" }, "Şartlar"), " · ",
+          h("a", { href: "legal/privacy.html", target: "_blank" }, "Gizlilik"), " · ",
+          h("a", { href: "legal/refund.html", target: "_blank" }, "İade")))
     ));
   },
 
