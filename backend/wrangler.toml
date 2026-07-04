@@ -1,0 +1,20 @@
+# Cloudflare Workers dağıtımı (ücretsiz kademe yeterli)
+# Kurulum: MORNING-CHECKLIST.md adım 3
+name = "us-citizenship-backend"
+main = "worker.js"
+compatibility_date = "2026-06-01"
+
+[[kv_namespaces]]
+binding = "ENTITLEMENTS"
+id = "KV_NAMESPACE_ID_BURAYA"   # wrangler kv namespace create ENTITLEMENTS
+
+[vars]
+ALLOWED_ORIGINS = "https://loadwizz.github.io"
+MOCK_STRIPE = "false"
+
+# GİZLİLER — asla buraya yazma; şu komutlarla ekle:
+#   wrangler secret put STRIPE_SECRET_KEY
+#   wrangler secret put STRIPE_WEBHOOK_SECRET
+#   wrangler secret put JWT_SECRET
+# Fiyat ID'leri (gizli değil ama env'de):
+#   wrangler secret put PRICE_PREP_MONTHLY   (veya [vars] altına ekle)
