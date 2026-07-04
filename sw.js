@@ -4,7 +4,7 @@
  * ========================================================================= */
 "use strict";
 
-const CACHE = "us-citizenship-v2";
+const CACHE = "us-citizenship-v3";
 
 const ASSETS = [
   "./",
@@ -12,16 +12,23 @@ const ASSETS = [
   "./manifest.webmanifest",
   "./css/app.css",
   "./js/data.js",
+  "./js/cues.js",
+  "./js/lang-tr.js",
   "./js/english-data.js",
   "./js/interview-data.js",
   "./js/db.js",
   "./js/srs.js",
   "./js/speech.js",
+  "./js/lang.js",
+  "./js/blocks.js",
+  "./js/advisor.js",
   "./js/coach.js",
   "./js/selfcheck.js",
   "./js/ui.js",
+  "./js/views/welcome.js",
   "./js/views/home.js",
   "./js/views/study.js",
+  "./js/views/block.js",
   "./js/views/exam.js",
   "./js/views/english.js",
   "./js/views/interview.js",

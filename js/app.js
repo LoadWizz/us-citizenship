@@ -10,6 +10,7 @@ const App = {
 
   DEFAULT_SETTINGS: {
     officials: { ...DEFAULT_OFFICIALS },
+    langMode: null,        // null = onboarding yapılmadı | "bilingual" | "en"
     newPerDay: 12,
     autoTTS: true,
     ttsRate: 0.92,
@@ -18,6 +19,10 @@ const App = {
     apiKey: "",
     coachModel: "claude-sonnet-4-6"
   },
+
+  /* Bilingual mod aktif mi? (İspanyolca eklenince "es" de bilingual sayılır) */
+  isBilingual() { return this.settings.langMode && this.settings.langMode !== "en"; },
+  nativeLang()  { return this.isBilingual() ? "tr" : null; },
 
   async loadSettings() {
     const saved = await DB.getKV("settings");
@@ -48,9 +53,17 @@ const App = {
     return map;
   },
 
-  async gradeCard(id, g) {
+  /* enMode: cevap salt İngilizce bağlamda verildi (mühür testi, deneme sınavı,
+   * EN-only dil modu). Successive relearning günlüğünü yalnız o zaman işler. */
+  async gradeCard(id, g, { enMode = false } = {}) {
     const map = await this.cards();
     const updated = SRS.grade(map.get(id) || SRS.newCard(id), g);
+    if (enMode && g >= 2) {
+      const today = new Date().toISOString().slice(0, 10);
+      const days = new Set(updated.enCorrectDays || []);
+      days.add(today);
+      updated.enCorrectDays = [...days].sort();
+    }
     map.set(id, updated);
     await DB.putCard(updated);
     await DB.markToday();
@@ -63,8 +76,9 @@ const App = {
   async planStats() {
     const map = await this.cards();
     const now = Date.now();
-    let due = 0, learning = 0, newCount = 0, mature = 0, young = 0, seen = 0;
+    let due = 0, learning = 0, newCount = 0, mature = 0, young = 0, seen = 0, masteredTotal = 0;
     for (const c of map.values()) {
+      if (SRS.isMastered(c)) masteredTotal++;
       if (c.state === "new") { newCount++; continue; }
       seen++;
       if (SRS.isDue(c, now)) due++;
@@ -77,7 +91,7 @@ const App = {
     const daysForNew = Math.ceil(newCount / Math.max(1, this.settings.newPerDay));
     const readinessDays = daysForNew + 14; // 2 hafta pekiştirme tamponu
     const readinessDate = new Date(now + readinessDays * 86400000);
-    return { due, learning, newCount, newToday, mature, young, seen, total: QUESTIONS.length, readinessDate, readinessDays };
+    return { due, learning, newCount, newToday, mature, young, seen, masteredTotal, total: QUESTIONS.length, readinessDate, readinessDays };
   },
 
   async streak() {
@@ -97,16 +111,22 @@ const App = {
     return streak;
   },
 
-  /* ---------- çalışma kuyruğu (interleaving: kategoriler karışık) ---------- */
-  async buildStudyQueue({ starOnly = false } = {}) {
+  /* ---------- çalışma kuyruğu ----------
+   * Blok modeli: TEKRARLAR kilidi açık tüm bloklardan gelir (aralıklı tekrar
+   * blok sınırlarını aşar), YENİ kartlar yalnız aktif bloktan tanıtılır.
+   * Kuyruk her zaman karışık (interleaving) — asla kategori bloklaması yok. */
+  async buildStudyQueue({ blockId = null } = {}) {
     const map = await this.cards();
     const now = Date.now();
-    const pool = starOnly ? QUESTIONS.filter(q => q.star) : QUESTIONS;
+    const states = await Blocks.getAllStates();
+    const unlockedIds = new Set(BLOCKS.filter(b => states.get(b.id).status !== "locked").flatMap(b => b.ids));
+    const block = blockId ? Blocks.byId(blockId) : await Blocks.current();
+    const newPool = block ? block.ids : [];
 
-    const dueCards = pool.filter(q => SRS.isDue(map.get(q.id), now));
-    const newCards = pool.filter(q => map.get(q.id).state === "new").slice(0, this.settings.newPerDay);
+    const dueCards = QUESTIONS.filter(q => unlockedIds.has(q.id) && SRS.isDue(map.get(q.id), now));
+    const newCards = QUESTIONS.filter(q => newPool.includes(q.id) && map.get(q.id).state === "new")
+      .slice(0, this.settings.newPerDay);
 
-    // Karıştır (interleave) — asla kategori bloklama yapma
     const queue = [...dueCards, ...newCards];
     for (let i = queue.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -147,12 +167,22 @@ const App = {
     }
 
     UI.register("/home", HomeView);
+    UI.register("/welcome", WelcomeView);
     UI.register("/study", StudyView);
+    UI.register("/block", BlockView);
+    UI.register("/blocktest", BlockTestView);
     UI.register("/exam", ExamView);
     UI.register("/english", EnglishView);
     UI.register("/interview", InterviewView);
     UI.register("/progress", ProgressView);
     UI.register("/settings", SettingsView);
+    if (typeof PaywallView !== "undefined") UI.register("/paywall", PaywallView);
+    if (typeof BillingView !== "undefined") UI.register("/billing", BillingView);
+
+    /* İlk açılış: dil modu seçilmeden ana akışa girilmez */
+    if (!this.settings.langMode && location.hash !== "#/welcome") {
+      location.hash = "#/welcome";
+    }
 
     document.querySelectorAll(".navbtn").forEach(btn => {
       btn.addEventListener("click", () => {

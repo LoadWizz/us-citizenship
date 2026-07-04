@@ -12,8 +12,10 @@ const Coach = (() => {
   /**
    * Sınav performans özetini Claude'a gönderir; Türkçe koçluk JSON'u döndürür:
    * { zaaflar: [], oncelikli_konular: [], calisma_plani: "", motivasyon: "" }
+   * v2: blok durumları + dil modu + İngilizce/bilingual performans farkı
+   * bağlama eklenir; koçtan NEDEN-SONUÇLU açıklama istenir.
    */
-  async function getCoaching({ apiKey, model, examResult, history, cards }) {
+  async function getCoaching({ apiKey, model, examResult, history, cards, blockStates, langMode }) {
     if (!apiKey) return null;
 
     const wrongOnes = examResult.items.filter(i => !i.correct).map(i => {
@@ -37,26 +39,50 @@ const Coach = (() => {
       .sort((a, b) => b.yanlisOrani - a.yanlisOrani)
       .slice(0, 15);
 
-    const prevExams = (history || []).slice(-5).map(e => ({ tarih: e.date, puan: `${e.score}/${e.total}`, gecti: e.passed }));
+    const prevExams = (history || []).slice(-8).map(e => ({
+      tarih: e.date.slice(0, 10), tur: e.type || "mock", blok: e.blockId || null,
+      puan: `${e.score}/${e.total}`, gecti: e.passed
+    }));
+
+    /* Blok durumları + iki dil modu arasındaki performans farkı:
+     * bilingual blok testi (tur=block) vs İngilizce mühür (tur=seal) puanları
+     * koça "Türkçe destekle geçiyor ama İngilizcede düşüyor" desenini gösterir. */
+    const bloklar = (blockStates || []).map(st => {
+      const b = BLOCKS.find(x => x.id === st.blockId);
+      return {
+        blok: `${st.blockId}. ${b ? b.name : ""}`,
+        durum: st.status,
+        blokSinavi: st.bestTest ? `${st.bestTest.score}/${st.bestTest.total}` : null,
+        ingilizceMuhru: st.bestSeal ? `${st.bestSeal.score}/${st.bestSeal.total}` : null
+      };
+    });
 
     const summary = {
-      sinav: { puan: `${examResult.score}/${examResult.total}`, gecti: examResult.passed, kategoriDagilimi: catStats, yanlisSorular: wrongOnes },
+      dilModu: langMode === "bilingual" ? "Türkçe destekli (TR+EN)" : "Yalnız İngilizce",
+      sonSinav: { tur: examResult.type || "mock", puan: `${examResult.score}/${examResult.total}`, gecti: examResult.passed, kategoriDagilimi: catStats, yanlisSorular: wrongOnes },
+      blokDurumlari: bloklar,
       gecmisSinavlar: prevExams,
       zayifKartlar: weakCards
     };
 
     const prompt =
-`Sen bir ABD vatandaşlık sınavı (2025 USCIS civics test, 128 soru, 20 sorudan 12 doğru = geçer) koçusun. Öğrenci Türkçe konuşuyor ve Chattanooga, Tennessee'de yaşıyor.
+`Sen bir ABD vatandaşlık sınavı koçusun (2025 USCIS civics test: 128 soruluk havuz, mülakatta 20 soru, 12 doğru = geçer, test SÖZLÜ ve İNGİLİZCE). Öğrenci Türkçe konuşuyor, Chattanooga, Tennessee'de yaşıyor. Uygulamada 7 bloklu bir sistem var: her blok önce (varsa Türkçe destekli) blok sınavı, sonra SALT İNGİLİZCE "mühür" testiyle (%85 eşik) tamamlanır — çünkü gerçek mülakatta memur İngilizce sorar ve tekrar hakkı sınırlıdır.
 
-Aşağıda öğrencinin deneme sınavı performansı var:
+Öğrencinin durumu:
 ${JSON.stringify(summary, null, 2)}
+
+KURALLARIN:
+1. NEDEN-SONUÇLU konuş: sadece "şurada zayıfsın" deme; "X oldu, bunun nedeni Y, gerçek mülakatta sonucu Z olur, bu yüzden şunu yap" kalıbını kullan. Örnek ton: "Blok 2'yi Türkçe destekle %90 geçtin ama İngilizce mühründe 12/18'de kaldın. Memur soruyu İngilizce soracak ve tekrar hakkın sınırlı; bu yüzden mühür için Blok 2'yi salt İngilizce tekrar etmeni öneriyorum."
+2. Bilingual öğrencide blok sınavı ile İngilizce mührü arasında puan farkı görürsen bunu MUTLAKA yorumla — bu, dil bariyerinin en net sinyalidir.
+3. Somut ol: hangi blok, hangi sorular, kaç gün, günde kaç dakika.
+4. Motivasyonda samimi ol ama abartma; ilerlemeyi verilerle teslim et.
 
 SADECE geçerli bir JSON nesnesi ile yanıt ver, başka hiçbir metin yazma. Şema:
 {
-  "zaaflar": ["kısa Türkçe zaaf tespiti", ...],
-  "oncelikli_konular": ["çalışılacak konu/soru grubu", ...],
-  "calisma_plani": "önümüzdeki 3-5 gün için somut Türkçe çalışma planı (tek paragraf)",
-  "motivasyon": "kısa, samimi Türkçe motivasyon mesajı"
+  "zaaflar": ["neden-sonuçlu kısa Türkçe tespit", ...],
+  "oncelikli_konular": ["çalışılacak blok/konu/soru grubu", ...],
+  "calisma_plani": "önümüzdeki 3-5 gün için somut Türkçe plan (tek paragraf, gün gün)",
+  "motivasyon": "kısa, samimi, veriye dayalı Türkçe motivasyon"
 }`;
 
     const res = await fetch(API_URL, {

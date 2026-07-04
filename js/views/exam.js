@@ -31,9 +31,20 @@ const ExamView = {
   },
 
   async start() {
-    const questions = await App.pickExamQuestions(20);
+    /* Havuz: tam havuz (128) premium; ücretsizde kilidi açık bloklar.
+     * Deneme sınavı HER ZAMAN salt İngilizce ve sözlü — gerçek sınav böyle. */
+    const hasFullPool = (typeof Entitlements === "undefined") || Entitlements.has("full_exam_pool");
+    let questions;
+    if (hasFullPool) {
+      questions = await App.pickExamQuestions(20);
+    } else {
+      const states = await Blocks.getAllStates();
+      const unlocked = new Set(BLOCKS.filter(b => states.get(b.id).status !== "locked").flatMap(b => b.ids));
+      const pool = QUESTIONS.filter(q => unlocked.has(q.id));
+      questions = [...pool].sort(() => Math.random() - 0.5).slice(0, 20);
+    }
     this.state = {
-      questions, idx: 0, correct: 0, wrong: 0,
+      questions, idx: 0, correct: 0, wrong: 0, limitedPool: !hasFullPool,
       items: [], startedAt: Date.now(), qStart: Date.now(), timerId: null
     };
     this.renderQuestion();
@@ -94,12 +105,14 @@ const ExamView = {
         h("span", { class: "ok" }, `✓ ${s.correct}`),
         h("span", { class: "muted" }, "hedef: 12"),
         h("span", { class: "fail" }, `✗ ${s.wrong}`)),
+      s.limitedPool && s.idx === 0 ? h("div", { class: "badge badge-warn" },
+        "Ücretsiz sürümde sorular yalnız açık bloklardan gelir — tam 128'lik havuz Premium'da") : null,
       h("div", { class: "card qcard" },
         h("div", { class: "qmeta" },
           h("span", { class: "qnum" }, `#${q.id}`),
           UI.catBadge(q.cat),
           q.star ? h("span", { class: "badge badge-star" }, "★") : null),
-        h("div", { class: "qtext", lang: "en" }, q.q),
+        h("div", { class: "qtext", lang: "en", html: Lang.qHTMLEn(q) }),
         h("div", { class: "qcontrols" },
           Speech.ttsAvailable ? h("button", { class: "btn btn-circle", onclick: () => Speech.speak(q.q, { rate: App.settings.ttsRate }) }, "🔊") : null),
         status),
@@ -165,7 +178,7 @@ const ExamView = {
       const elapsed = Math.round((Date.now() - s.qStart) / 1000);
       correct ? s.correct++ : s.wrong++;
       s.items.push({ id: q.id, correct, seconds: elapsed, bySpeech: !!(speech && speech.match) });
-      await App.gradeCard(q.id, correct ? 2 : 0); // SRS'e geri besle
+      await App.gradeCard(q.id, correct ? 2 : 0, { enMode: true }); // deneme sınavı = salt İngilizce bağlam
       s.idx++;
       this.renderQuestion();
     };
@@ -203,6 +216,7 @@ const ExamView = {
 
     const examRecord = {
       date: new Date().toISOString(),
+      type: "mock",
       score: s.correct, wrong: s.wrong, total: 20, asked: total,
       passed, perCat, items: s.items,
       durationSec: Math.round((Date.now() - s.startedAt) / 1000)
@@ -249,8 +263,13 @@ const ExamView = {
       h("button", { class: "btn btn-ghost", onclick: () => UI.navigate("/home") }, "← Bugün'e dön")
     ));
 
-    // Claude koçu — anahtar varsa
-    if (App.settings.apiKey) {
+    // Claude koçu — Pro özelliği + anahtar gerekir; ikisi de yoksa zarif düşüş
+    const coachAllowed = (typeof Entitlements === "undefined") || Entitlements.has("ai_coach");
+    if (!coachAllowed) {
+      coachBox.appendChild(h("div", { class: "card locked-teaser", onclick: () => UI.navigate("/paywall") },
+        h("b", {}, "🤖 AI Koç — Vatandaşlık planında"),
+        h("div", { class: "small muted" }, "Her sınavdan sonra kişisel neden-sonuç analizi, blok bazlı zaaf tespiti ve günlük plan. Dokunarak planları gör.")));
+    } else if (App.settings.apiKey) {
       this.renderCoach(coachBox, examRecord);
     } else {
       coachBox.appendChild(h("div", { class: "card muted small" },
@@ -267,10 +286,12 @@ const ExamView = {
     try {
       const history = await DB.getAllExams();
       const cards = Array.from((await App.cards()).values());
+      const blockStates = Array.from((await Blocks.getAllStates()).values());
       const coaching = await Coach.getCoaching({
         apiKey: App.settings.apiKey,
         model: App.settings.coachModel,
-        examResult: examRecord, history, cards
+        examResult: examRecord, history, cards,
+        blockStates, langMode: App.settings.langMode
       });
       box.innerHTML = "";
       box.appendChild(h("div", { class: "card coach-card" },

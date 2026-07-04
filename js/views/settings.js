@@ -56,6 +56,19 @@ const SettingsView = {
 
       h("div", { class: "card" },
         h("h3", {}, "📖 Çalışma Tercihleri"),
+        h("label", { class: "field" },
+          h("span", { class: "field-label" }, "Dil modu"),
+          h("select", {
+            class: "input",
+            onchange: async (e) => {
+              s.langMode = e.target.value;
+              await App.saveSettings();
+              UI.toast(s.langMode === "bilingual" ? "Türkçe destek açık" : "Salt İngilizce mod");
+            }
+          },
+            h("option", { value: "bilingual", selected: s.langMode === "bilingual" }, "🇹🇷+🇺🇸 Türkçe destekli (soru önce Türkçe)"),
+            h("option", { value: "en", selected: s.langMode === "en" }, "🇺🇸 Yalnız İngilizce")),
+          h("div", { class: "small muted" }, "Deneme sınavları ve mühür testleri her zaman salt İngilizcedir — gerçek sınav öyle.")),
         numField("newPerDay", "Günlük yeni soru sayısı", 3, 40),
         toggleField("autoTTS", "Soruları otomatik sesli oku", "Memur simülasyonu — kart açılınca soru okunur"),
         h("label", { class: "field" },

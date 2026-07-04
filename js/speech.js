@@ -6,33 +6,55 @@
 "use strict";
 
 const Speech = (() => {
-  /* ---------- TTS ---------- */
+  /* ---------- TTS ----------
+   * Ses katmanı SOYUTLAMASI: speak() ileride kayıtlı insan sesi dosyalarıyla
+   * (AudioProvider) değiştirilecek tek giriş noktasıdır — arayüz sabit kalır:
+   * speak(text, {lang, rate, onend}). Şimdilik sistem TTS. */
   const ttsAvailable = "speechSynthesis" in window;
-  let voice = null;
+  const voiceByLang = { en: null, tr: null };
 
-  function pickVoice() {
+  function pickVoices() {
     if (!ttsAvailable) return;
     const voices = speechSynthesis.getVoices();
-    voice =
+    voiceByLang.en =
       voices.find(v => v.lang === "en-US" && /Samantha|Google US|Alex|Aaron/i.test(v.name)) ||
       voices.find(v => v.lang === "en-US") ||
       voices.find(v => v.lang && v.lang.startsWith("en")) || null;
+    voiceByLang.tr =
+      voices.find(v => v.lang === "tr-TR" && /Yelda|Google/i.test(v.name)) ||
+      voices.find(v => v.lang === "tr-TR") ||
+      voices.find(v => v.lang && v.lang.startsWith("tr")) || null;
   }
   if (ttsAvailable) {
-    pickVoice();
-    speechSynthesis.onvoiceschanged = pickVoice;
+    pickVoices();
+    speechSynthesis.onvoiceschanged = pickVoices;
   }
 
-  function speak(text, { rate = 0.92, onend = null } = {}) {
+  function hasVoice(lang) { return !!voiceByLang[lang]; }
+
+  function speak(text, { lang = "en", rate = 0.92, onend = null } = {}) {
     if (!ttsAvailable) { if (onend) onend(); return false; }
+    /* Anadil sesi yoksa (bazı cihazlarda tr-TR kurulu değil) sessizce atla —
+     * görsel metin zaten ekranda; onend zinciri bozulmasın. */
+    if (lang !== "en" && !voiceByLang[lang]) { if (onend) onend(); return false; }
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = "en-US";
-    if (voice) u.voice = voice;
+    u.lang = lang === "tr" ? "tr-TR" : "en-US";
+    if (voiceByLang[lang]) u.voice = voiceByLang[lang];
     u.rate = rate;
     if (onend) u.onend = onend;
     speechSynthesis.speak(u);
     return true;
+  }
+
+  /* Sıralı okuma: önce anadil, sonra İngilizce (bilingual kart akışı) */
+  function speakSequence(parts, opts = {}) {
+    const list = parts.filter(p => p && p.text);
+    const next = (i) => {
+      if (i >= list.length) return;
+      speak(list[i].text, { lang: list[i].lang, rate: opts.rate, onend: () => next(i + 1) });
+    };
+    next(0);
   }
 
   function stopSpeaking() { if (ttsAvailable) speechSynthesis.cancel(); }
@@ -135,5 +157,5 @@ const Speech = (() => {
     return { words: result, extra: t.length - e.length, ratio: e.length ? correct / e.length : 0 };
   }
 
-  return { ttsAvailable, sttAvailable, speak, stopSpeaking, listen, stopListening, normalize, matchAnswer, compareDictation };
+  return { ttsAvailable, sttAvailable, hasVoice, speak, speakSequence, stopSpeaking, listen, stopListening, normalize, matchAnswer, compareDictation };
 })();

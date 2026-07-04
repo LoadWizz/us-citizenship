@@ -93,6 +93,13 @@ const SRS = (() => {
     return 4;                                                       // oturmuş
   }
 
+  /* Successive relearning kriteri (Rawson & Dunlosky 2011):
+   * soru FARKLI İKİ GÜNDE İngilizce modda doğru cevaplanmışsa ustalaşmıştır.
+   * enCorrectDays: ["YYYY-MM-DD", ...] — App.gradeCard EN modunda doldurur. */
+  function isMastered(card) {
+    return !!card && Array.isArray(card.enCorrectDays) && card.enCorrectDays.length >= 2;
+  }
+
   /* zayıflık puanı — sınav ağırlıklandırması için (0..~3) */
   function weaknessScore(card) {
     if (!card || card.seen === 0) return 1.0; // hiç görülmemiş = orta öncelik
@@ -101,5 +108,5 @@ const SRS = (() => {
     return wrongRate * 2 + lapsePenalty;
   }
 
-  return { newCard, grade, isDue, masteryLevel, weaknessScore, MATURE_DAYS };
+  return { newCard, grade, isDue, masteryLevel, isMastered, weaknessScore, MATURE_DAYS };
 })();

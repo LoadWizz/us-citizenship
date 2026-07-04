@@ -3,14 +3,15 @@
  * Depolar:
  *   cards : soru başına SRS durumu           (keyPath: id)
  *   kv    : ayarlar ve tekil değerler        (keyPath: key)
- *   exams : deneme sınavı geçmişi            (autoIncrement)
+ *   exams : sınav geçmişi (mock/block/seal)  (autoIncrement)
  *   days  : günlük aktivite kaydı (streak)   (keyPath: date "YYYY-MM-DD")
+ *   blocks: blok durumları (mühür sistemi)   (keyPath: blockId)   [v2]
  * ========================================================================= */
 "use strict";
 
 const DB = (() => {
   const NAME = "us-citizenship";
-  const VERSION = 1;
+  const VERSION = 2;
   let _db = null;
 
   function open() {
@@ -23,6 +24,7 @@ const DB = (() => {
         if (!db.objectStoreNames.contains("kv"))    db.createObjectStore("kv",    { keyPath: "key" });
         if (!db.objectStoreNames.contains("exams")) db.createObjectStore("exams", { autoIncrement: true });
         if (!db.objectStoreNames.contains("days"))  db.createObjectStore("days",  { keyPath: "date" });
+        if (!db.objectStoreNames.contains("blocks")) db.createObjectStore("blocks", { keyPath: "blockId" });
       };
       req.onsuccess = () => { _db = req.result; resolve(_db); };
       req.onerror = () => reject(req.error);
@@ -68,6 +70,11 @@ const DB = (() => {
     async getAllExams()    { const db = await open(); return reqToPromise(db.transaction("exams").objectStore("exams").getAll()); },
     async clearExams()     { return tx("exams", "readwrite", s => s.clear()); },
 
+    /* --- blocks (mühür sistemi) --- */
+    async getAllBlocks()   { const db = await open(); return reqToPromise(db.transaction("blocks").objectStore("blocks").getAll()); },
+    async putBlock(state)  { return tx("blocks", "readwrite", s => s.put(state)); },
+    async clearBlocks()    { return tx("blocks", "readwrite", s => s.clear()); },
+
     /* --- days (streak) --- */
     async markToday() {
       const date = new Date().toISOString().slice(0, 10);
@@ -81,23 +88,25 @@ const DB = (() => {
       await this.clearCards();
       await this.clearExams();
       await this.clearDays();
-      // ayarlar (kv) korunur — sadece ilerleme sıfırlanır
+      await this.clearBlocks();
+      // ayarlar ve abonelik (kv) korunur — sadece ilerleme sıfırlanır
     },
 
     /* --- dışa/içe aktarma --- */
     async exportAll() {
-      const [cards, exams, days] = await Promise.all([this.getAllCards(), this.getAllExams(), this.getAllDays()]);
+      const [cards, exams, days, blocks] = await Promise.all([this.getAllCards(), this.getAllExams(), this.getAllDays(), this.getAllBlocks()]);
       const kvKeys = ["settings"];
       const kv = {};
       for (const k of kvKeys) kv[k] = await this.getKV(k);
-      return { version: 1, exportedAt: new Date().toISOString(), cards, exams, days, kv };
+      return { version: 2, exportedAt: new Date().toISOString(), cards, exams, days, blocks, kv };
     },
     async importAll(data) {
-      if (!data || data.version !== 1) throw new Error("Geçersiz yedek dosyası");
+      if (!data || (data.version !== 1 && data.version !== 2)) throw new Error("Geçersiz yedek dosyası");
       await this.resetAll();
       if (data.cards && data.cards.length) await this.putCards(data.cards);
       if (data.exams) for (const e of data.exams) await this.addExam(e);
       if (data.days)  for (const d of data.days) await tx("days", "readwrite", s => s.put(d));
+      if (data.blocks) for (const b of data.blocks) await this.putBlock(b);
       if (data.kv && data.kv.settings) await this.setKV("settings", data.kv.settings);
     }
   };
