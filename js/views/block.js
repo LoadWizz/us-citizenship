@@ -199,21 +199,24 @@ const BlockTestView = {
     status.textContent = "🎙️ Dinliyorum...";
     mic.classList.add("listening");
     Speech.listen({
-      onResult: (alts) => {
-        const echo = Speech.compareDictation(q.q, alts[0]);
-        if (echo.ratio > 0.55) {
+      onResult: async (alts) => {
+        /* önce eşleşmeyi dene; yankı kontrolü YALNIZ başarısızlıkta
+         * (cevap soru kelimesi içeriyorsa — "Supreme Court" — yankı sanılmasın) */
+        const res = Speech.matchAnswer(alts, answers);
+        if (res.match) {
+          this.s.speechMatch = { heard: res.heard, tier: res.tier };
+          await App.logAttempt({ qid: q.id, mode: this.s.mode || "block", heard: res.heard, expected: res.best.answer, verdict: res.tier });
+          status.innerHTML = `✅ Eşleşti: “${UI.esc(res.heard)}”`;
+          status.className = "speech-status ok";
+          this.reveal(q, answers);
+          return;
+        }
+        if (Speech.looksLikeEcho(q.q, res.heard, answers)) {
           status.innerHTML = "🔁 Sorunun sesi algılandı — soru bitince cevabı söyle";
           return;
         }
-        const res = Speech.matchAnswer(alts, answers);
-        if (res.match) {
-          this.s.speechMatch = { heard: alts[0] };
-          status.innerHTML = `✅ Eşleşti: “${UI.esc(alts[0])}”`;
-          status.className = "speech-status ok";
-          this.reveal(q, answers);
-        } else {
-          status.innerHTML = `Duyulan: “${UI.esc(alts[0])}” — eşleşmedi. Tekrar dene veya cevabı göster`;
-        }
+        await App.logAttempt({ qid: q.id, mode: this.s.mode || "block", heard: res.heard, expected: answers[0] || null, verdict: "eşleşmedi" });
+        status.innerHTML = `Duyulan: “${UI.esc(res.heard)}” — eşleşmedi. Tekrar dene veya cevabı göster`;
       },
       onError: (err) => {
         status.textContent = Speech.sttErrorMessage(err);

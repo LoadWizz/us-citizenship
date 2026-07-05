@@ -187,6 +187,38 @@ const SelfCheck = (() => {
     } catch (e) { srsOk = false; }
     ok("SRS + ustalık (2 farklı gün EN) testi", srsOk);
 
+    /* ---------- 8b) Eşleştirici v2 (göçmen-dostu STT kabulü) ---------- */
+    if (typeof Speech !== "undefined" && Speech.matchAnswer) {
+      const M = (t, a) => Speech.matchAnswer([t], a);
+      const mOk =
+        M("27", ["Twenty-seven (27)"]).match === true &&                       // S7 sayı bugı (rakam)
+        M("twenty seven", ["Twenty-seven (27)"]).match === true &&             // sayı kelimesi
+        M("first president", ["First president of the United States"]).match === true && // alt küme kabulü
+        M("president", ["First president of the United States"]).match === false &&      // cılız cevap reddi
+        M("the constitution", ["(U.S.) Constitution"]).match === true &&
+        M("constetution", ["(U.S.) Constitution"]).tier === "yakın" &&          // aksan hata payı
+        M("constitutions", ["(U.S.) Constitution"]).match === true &&           // çoğul kökü
+        M("supreme court", ["Supreme Court"]).tier === "tam" &&
+        M("terrorists attacked america", ["Terrorists attacked the United States"]).match === true && // eş anlam
+        M("fourteenth amendment", ["14th Amendment"]).match === true &&        // sıra sayısı
+        M("world war two", ["World War II"]).match === true &&                 // romen rakamı
+        M("washington dc", ["Washington, D.C."]).match === true &&
+        M("four hundred thirty five", ["Four hundred thirty-five (435)"]).match === true &&
+        M("bla bla bla", ["Supreme Court"]).match === false;
+      ok("Eşleştirici v2 (sayı katlama, alt küme, hata payı, eş anlam)", mOk);
+
+      const echoOk =
+        Speech.looksLikeEcho("What is the highest court in the United States?",
+          "what is the highest court in the united states", ["Supreme Court"]) === true &&
+        Speech.looksLikeEcho("What is the highest court in the United States?",
+          "supreme court", ["Supreme Court"]) === false;
+      ok("Yankı tespiti (cevap kelimeleri yankı sanılmaz)", echoOk);
+
+      ok("Ses metni: parantez içeriği okunmaz (çift sayı bugı)",
+         Speech.speakable("Four (4) years") === "Four years" &&
+         Speech.speakable("(U.S.) Constitution") === "Constitution");
+    }
+
     /* ---------- 9) Entitlement kapıları (modül yüklüyse) ---------- */
     if (typeof Entitlements !== "undefined") {
       try {

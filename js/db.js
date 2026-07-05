@@ -6,12 +6,15 @@
  *   exams : sınav geçmişi (mock/block/seal)  (autoIncrement)
  *   days  : günlük aktivite kaydı (streak)   (keyPath: date "YYYY-MM-DD")
  *   blocks: blok durumları (mühür sistemi)   (keyPath: blockId)   [v2]
+ *   attempts: sesli/işaretli cevap denemeleri (autoIncrement)     [v3]
+ *     {qid, mode, heard, expected, verdict, ms, lang, ts} — cihazda kalır;
+ *     zamanla soru-başına gerçek zorluk analizi için ham veri.
  * ========================================================================= */
 "use strict";
 
 const DB = (() => {
   const NAME = "us-citizenship";
-  const VERSION = 2;
+  const VERSION = 3;
   let _db = null;
 
   function open() {
@@ -25,6 +28,7 @@ const DB = (() => {
         if (!db.objectStoreNames.contains("exams")) db.createObjectStore("exams", { autoIncrement: true });
         if (!db.objectStoreNames.contains("days"))  db.createObjectStore("days",  { keyPath: "date" });
         if (!db.objectStoreNames.contains("blocks")) db.createObjectStore("blocks", { keyPath: "blockId" });
+        if (!db.objectStoreNames.contains("attempts")) db.createObjectStore("attempts", { autoIncrement: true });
       };
       req.onsuccess = () => { _db = req.result; resolve(_db); };
       req.onerror = () => reject(req.error);
@@ -70,6 +74,11 @@ const DB = (() => {
     async getAllExams()    { const db = await open(); return reqToPromise(db.transaction("exams").objectStore("exams").getAll()); },
     async clearExams()     { return tx("exams", "readwrite", s => s.clear()); },
 
+    /* --- attempts (cevap denemeleri — zorluk analizi ham verisi) --- */
+    async addAttempt(a)    { return tx("attempts", "readwrite", s => s.add(a)); },
+    async getAllAttempts() { const db = await open(); return reqToPromise(db.transaction("attempts").objectStore("attempts").getAll()); },
+    async clearAttempts()  { return tx("attempts", "readwrite", s => s.clear()); },
+
     /* --- blocks (mühür sistemi) --- */
     async getAllBlocks()   { const db = await open(); return reqToPromise(db.transaction("blocks").objectStore("blocks").getAll()); },
     async putBlock(state)  { return tx("blocks", "readwrite", s => s.put(state)); },
@@ -89,6 +98,7 @@ const DB = (() => {
       await this.clearExams();
       await this.clearDays();
       await this.clearBlocks();
+      await this.clearAttempts();
       // ayarlar ve abonelik (kv) korunur — sadece ilerleme sıfırlanır
     },
 

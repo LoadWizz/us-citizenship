@@ -45,7 +45,7 @@ const ExamView = {
     }
     this.state = {
       questions, idx: 0, correct: 0, wrong: 0, limitedPool: !hasFullPool,
-      items: [], startedAt: Date.now(), qStart: Date.now(), timerId: null
+      items: [], startedAt: Date.now(), qStart: Date.now(), timerId: null, viewIdx: null
     };
     this.renderQuestion();
   },
@@ -56,6 +56,56 @@ const ExamView = {
     return s.correct >= 12 || s.wrong >= 9;
   },
 
+  /* Üst gezinti: cevaplanan sorular arasında ileri/geri (cevaplar açık kalır) */
+  navBar() {
+    const { h } = UI;
+    const s = this.state;
+    const at = s.viewIdx === null ? s.idx : s.viewIdx;
+    const canBack = at > 0;
+    const canFwd = s.viewIdx !== null; // yalnız geçmişteyken ileri gidilebilir
+    return h("div", { class: "study-top" },
+      h("button", { class: "btn btn-ghost small-btn", onclick: () => { if (confirm("Sınavı iptal et?")) { clearInterval(s.timerId); UI.navigate("/home"); } } }, "✕"),
+      h("div", { class: "exam-nav" },
+        h("button", { class: "btn btn-ghost small-btn", disabled: !canBack, onclick: () => this.goto(at - 1) }, "‹"),
+        h("span", { class: "muted" }, `Soru ${at + 1} / ${s.questions.length}`),
+        h("button", { class: "btn btn-ghost small-btn", disabled: !canFwd, onclick: () => this.goto(at + 1) }, "›")),
+      h("span", { class: "timer", id: "exam-timer" }, "0:00"));
+  },
+
+  goto(i) {
+    const s = this.state;
+    if (i >= s.items.length) { s.viewIdx = null; this.renderQuestion(); }
+    else if (i >= 0) { s.viewIdx = i; this.renderAnswered(i); }
+  },
+
+  /* Cevaplanmış soruya dönüş: verdiği cevap AÇIK kalır, tekrar sorulmaz */
+  renderAnswered(i) {
+    const { h } = UI;
+    const s = this.state;
+    const root = this.root;
+    root.innerHTML = "";
+    Speech.stopSpeaking();
+    Speech.stopListening();
+    const it = s.items[i];
+    const q = QUESTIONS.find(x => x.id === it.id);
+    const answers = effectiveAnswers(q, App.settings.officials);
+
+    root.appendChild(h("div", { class: "page" },
+      this.navBar(),
+      h("div", { class: "score-strip" },
+        h("span", { class: "ok" }, `✓ ${s.correct}`),
+        h("span", { class: "muted" }, "hedef: 12"),
+        h("span", { class: "fail" }, `✗ ${s.wrong}`)),
+      h("div", { class: "card qcard" },
+        h("div", { class: "qtext", lang: "en", html: Lang.qHTMLEn(q) })),
+      h("div", { class: `verdict ${it.correct ? "verdict-ok" : "verdict-no"}` },
+        it.correct ? "✅ Doğru cevapladın" : "✗ Bilemedin"),
+      it.heard ? h("p", { class: "small muted center" }, `Senin cevabın: “${it.heard}”`) : null,
+      UI.answerCard(q, { natLang: null }),
+      h("button", { class: "btn btn-primary btn-big", onclick: () => this.goto(s.items.length) }, "Kaldığın soruya dön →")
+    ));
+  },
+
   renderQuestion() {
     const { h } = UI;
     const s = this.state;
@@ -64,6 +114,7 @@ const ExamView = {
     Speech.stopSpeaking();
     Speech.stopListening();
     clearInterval(s.timerId);
+    s.viewIdx = null;
 
     if (s.idx >= s.questions.length || this.finishedEarly()) {
       return this.renderResult();
@@ -72,9 +123,8 @@ const ExamView = {
     const q = s.questions[s.idx];
     const answers = effectiveAnswers(q, App.settings.officials);
     s.qStart = Date.now();
-    s.answeredBySpeech = null;
+    this.kara = Karaoke.line(q.q, { cue: CUES[q.id], cat: q.cat });
 
-    const timerEl = h("span", { class: "timer", id: "exam-timer" }, "0:00");
     s.timerId = setInterval(() => {
       const sec = Math.floor((Date.now() - s.qStart) / 1000);
       const el = document.getElementById("exam-timer");
@@ -88,18 +138,19 @@ const ExamView = {
     const answerArea = h("div", { id: "answer-area" });
 
     answerArea.appendChild(h("div", { class: "exam-btns" },
-      Speech.micUsable() ? h("button", {
-        class: "btn btn-primary btn-big", id: "mic-btn",
+      Speech.ttsAvailable ? h("button", {
+        class: "btn btn-primary btn-big", id: "ask-btn",
+        onclick: () => this.askAloud(q, answers)
+      }, "🔊 Sesli sor") : null,
+      (!Speech.ttsAvailable && Speech.micUsable()) ? h("button", {
+        class: "btn btn-primary btn-big",
         onclick: () => this.listenAnswer(q, answers)
       }, "🎤 Sesli Cevapla") : null,
-      h("button", { class: Speech.micUsable() ? "btn btn-outline btn-big" : "btn btn-primary btn-big", onclick: () => this.reveal(q, answers) }, "Cevabı Göster")
+      h("button", { class: "btn btn-outline btn-big", onclick: () => this.reveal(q, answers) }, "Cevabı Göster")
     ));
 
     root.appendChild(h("div", { class: "page" },
-      h("div", { class: "study-top" },
-        h("button", { class: "btn btn-ghost small-btn", onclick: () => { if (confirm("Sınavı iptal et?")) UI.navigate("/home"); } }, "✕ İptal"),
-        h("span", { class: "muted" }, `Soru ${s.idx + 1} / ${s.questions.length}`),
-        timerEl),
+      this.navBar(),
       h("div", { class: "progressbar" }, h("div", { class: "progressbar-fill", style: { width: `${(s.idx / s.questions.length) * 100}%` } })),
       h("div", { class: "score-strip" },
         h("span", { class: "ok" }, `✓ ${s.correct}`),
@@ -108,88 +159,90 @@ const ExamView = {
       s.limitedPool && s.idx === 0 ? h("div", { class: "badge badge-warn" },
         "Ücretsiz sürümde sorular yalnız açık bloklardan gelir — tam 128'lik havuz Premium'da") : null,
       h("div", { class: "card qcard" },
-        h("div", { class: "qtext", lang: "en", html: Lang.qHTMLEn(q) }),
-        h("div", { class: "qcontrols" },
-          Speech.ttsAvailable ? h("button", { class: "btn btn-circle", onclick: () => Speech.speak(q.q, { rate: App.settings.ttsRate }) }, "🔊") : null),
+        h("div", { class: "qtext", lang: "en" }, this.kara.el),
         status),
       answerArea
     ));
     UI.tapGuard(answerArea); // hayalet dokunuş koruması
+  },
 
-    if (Speech.ttsAvailable) Speech.speak(q.q, { rate: App.settings.ttsRate });
+  /* Soruyu karaoke ile oku (memur simülasyonu); bitince mikrofonu aç */
+  askAloud(q, answers) {
+    Karaoke.play(this.kara, {
+      rate: App.settings.ttsRate,
+      onend: () => {
+        if (Speech.micUsable()) setTimeout(() => this.listenAnswer(q, answers), 350);
+      }
+    });
   },
 
   listenAnswer(q, answers) {
     const status = document.getElementById("speech-status");
-    const mic = document.getElementById("mic-btn");
-    status.textContent = "🎙️ Dinliyorum...";
-    mic.classList.add("listening");
+    if (!status) return;
+    status.innerHTML = "🎙️ <b>Cevabını söyle...</b>";
+    status.className = "speech-status listening";
     Speech.listen({
-      onResult: (alts) => {
-        // Yankı koruması: mikrofon sorunun kendisini (TTS/ortam) duyduysa yok say
-        const echo = Speech.compareDictation(q.q, alts[0]);
-        if (echo.ratio > 0.55) {
-          this.state.answeredBySpeech = null;
-          status.innerHTML = "🔁 Sorunun sesi algılandı — soru bittikten sonra 🎤'a basıp CEVABI söyle";
-          status.className = "speech-status";
-          return;
-        }
+      onResult: async (alts) => {
         const res = Speech.matchAnswer(alts, answers);
         if (res.match) {
-          // Sadece gerçek eşleşmede cevap otomatik açılır
-          this.state.answeredBySpeech = { match: true, heard: alts[0] };
-          status.innerHTML = `✅ Eşleşti: “${UI.esc(alts[0])}”`;
-          status.className = "speech-status ok";
-          this.reveal(q, answers);
-        } else {
-          // Eşleşme yok: soru ekranda kalır — tekrar dene veya kendin aç
-          this.state.answeredBySpeech = null;
-          status.innerHTML = `Duyulan: “${UI.esc(alts[0])}” — eşleşmedi. 🎤 ile tekrar dene veya cevabı göster`;
-          status.className = "speech-status";
+          await App.logAttempt({ qid: q.id, mode: "exam", heard: res.heard, expected: res.best.answer, verdict: res.tier, ms: Date.now() - this.state.qStart });
+          /* kabul edilebilir sınırlarda → Doğru! (otomatik işaretlenir) */
+          return this.mark(q, true, { heard: res.heard, tier: res.tier });
         }
+        if (Speech.looksLikeEcho(q.q, res.heard, answers)) {
+          status.innerHTML = "🔁 Sorunun sesi algılandı — okuma bittikten sonra CEVABI söyle";
+          status.className = "speech-status";
+          status.appendChild(UI.h("div", { class: "step-btns" },
+            UI.h("button", { class: "btn btn-outline small-btn", onclick: () => this.listenAnswer(q, answers) }, "🎤 Tekrar dene")));
+          return;
+        }
+        await App.logAttempt({ qid: q.id, mode: "exam", heard: res.heard, expected: answers[0] || null, verdict: "eşleşmedi", ms: Date.now() - this.state.qStart });
+        status.innerHTML = `Duyulan: “${UI.esc(res.heard)}” — eşleşmedi.`;
+        status.className = "speech-status";
+        status.appendChild(UI.h("div", { class: "step-btns" },
+          UI.h("button", { class: "btn btn-outline small-btn", onclick: () => this.listenAnswer(q, answers) }, "🎤 Tekrar dene"),
+          UI.h("button", { class: "btn btn-ghost small-btn", onclick: () => this.reveal(q, answers) }, "Cevabı göster")));
       },
       onError: (err) => {
         status.textContent = Speech.sttErrorMessage(err);
-        mic.classList.remove("listening");
-        if (!Speech.micUsable()) mic.style.display = "none";
+        status.className = "speech-status";
       },
-      onEnd: () => mic.classList.remove("listening")
+      onEnd: () => {}
     });
+  },
+
+  /* İşaretle ve kısa hüküm ekranıyla ilerle */
+  async mark(q, correct, { heard = null, tier = null } = {}) {
+    const s = this.state;
+    clearInterval(s.timerId);
+    const elapsed = Math.round((Date.now() - s.qStart) / 1000);
+    correct ? s.correct++ : s.wrong++;
+    s.items.push({ id: q.id, correct, seconds: elapsed, heard, tier, bySpeech: !!heard });
+    await App.gradeCard(q.id, correct ? 2 : 0, { enMode: true });
+    s.idx++;
+
+    /* kısa hüküm şeridi — sonra sıradaki soru */
+    const status = document.getElementById("speech-status");
+    if (status && heard) {
+      status.innerHTML = correct ? "✅ <b>Doğru!</b>" : "✗ Yanlış";
+      status.className = "speech-status " + (correct ? "ok" : "");
+    }
+    setTimeout(() => this.renderQuestion(), heard ? 900 : 0);
   },
 
   reveal(q, answers) {
     const { h } = UI;
-    const s = this.state;
     const area = document.getElementById("answer-area");
     area.innerHTML = "";
     UI.tapGuard(area); // çift dokunuş "Doğru bildim"e kaçmasın
-
-    const speech = s.answeredBySpeech;
+    Speech.stopListening();
 
     area.appendChild(UI.answerCard(q, { natLang: null })); // sınav salt İngilizce
-    if (speech && speech.match) {
-      area.appendChild(h("div", { class: "speech-status ok" }, "🎤 Sesli cevabın kabul edildi"));
-    }
-
-    const mark = async (correct) => {
-      clearInterval(s.timerId);
-      const elapsed = Math.round((Date.now() - s.qStart) / 1000);
-      correct ? s.correct++ : s.wrong++;
-      s.items.push({ id: q.id, correct, seconds: elapsed, bySpeech: !!(speech && speech.match) });
-      await App.gradeCard(q.id, correct ? 2 : 0, { enMode: true }); // deneme sınavı = salt İngilizce bağlam
-      s.idx++;
-      this.renderQuestion();
-    };
 
     area.appendChild(h("div", { class: "exam-btns" },
-      h("button", { class: "btn grade-btn grade-good btn-big", onclick: () => mark(true) }, "✓ Doğru bildim"),
-      h("button", { class: "btn grade-btn grade-again btn-big", onclick: () => mark(false) }, "✗ Bilemedim")
+      h("button", { class: "btn grade-btn grade-good btn-big", onclick: () => this.mark(q, true) }, "✓ Doğru bildim"),
+      h("button", { class: "btn grade-btn grade-again btn-big", onclick: () => this.mark(q, false) }, "✗ Bilemedim")
     ));
-
-    if (speech && speech.match) {
-      // sesli eşleşme varsa otomatik önerilen: doğru
-      UI.toast("Eşleşme bulundu — 'Doğru bildim' önerildi");
-    }
   },
 
   async renderResult() {

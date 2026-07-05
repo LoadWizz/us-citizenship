@@ -55,8 +55,11 @@ const App = {
   },
 
   /* enMode: cevap salt İngilizce bağlamda verildi (mühür testi, deneme sınavı,
-   * EN-only dil modu). Successive relearning günlüğünü yalnız o zaman işler. */
-  async gradeCard(id, g, { enMode = false } = {}) {
+   * EN-only dil modu). Successive relearning günlüğünü yalnız o zaman işler.
+   * learned bayrağı ("bu soruyu öğrendim"): kartı ÇALIŞMA rotasyonundan
+   * çıkarır; blok testi/sınav sormaya devam eder ve YANLIŞ cevap bayrağı
+   * silip kartı çalışmaya geri döndürür (Erkan kuralı, 5 Tem). */
+  async gradeCard(id, g, { enMode = false, learned = null } = {}) {
     const map = await this.cards();
     const updated = SRS.grade(map.get(id) || SRS.newCard(id), g);
     if (enMode && g >= 2) {
@@ -65,10 +68,22 @@ const App = {
       days.add(today);
       updated.enCorrectDays = [...days].sort();
     }
+    if (g === 0) updated.learned = false;          // testte yanlış → çalışmaya geri
+    if (learned === true) updated.learned = true;  // kullanıcı "öğrendim" dedi
     map.set(id, updated);
     await DB.putCard(updated);
     await DB.markToday();
     return updated;
+  },
+
+  /* Cevap denemesi kaydı — cihazda kalır; zorluk analizi ham verisi */
+  async logAttempt({ qid, mode, heard = null, expected = null, verdict, ms = null }) {
+    try {
+      await DB.addAttempt({
+        qid, mode, heard, expected, verdict, ms,
+        lang: this.settings.langMode || "?", ts: Date.now()
+      });
+    } catch (_) { /* günlük tutulamazsa akış bozulmaz */ }
   },
 
   invalidateCards() { this._cardCache = null; },
@@ -77,12 +92,13 @@ const App = {
   async planStats() {
     const map = await this.cards();
     const now = Date.now();
-    let due = 0, learning = 0, newCount = 0, mature = 0, young = 0, seen = 0, masteredTotal = 0;
+    let due = 0, learning = 0, newCount = 0, mature = 0, young = 0, seen = 0, masteredTotal = 0, learnedCount = 0;
     for (const c of map.values()) {
       if (SRS.isMastered(c)) masteredTotal++;
+      if (c.learned) learnedCount++;
       if (c.state === "new") { newCount++; continue; }
       seen++;
-      if (SRS.isDue(c, now)) due++;
+      if (SRS.isDue(c, now) && !c.learned) due++;
       if (c.state === "learning") learning++;
       else if (c.interval >= SRS.MATURE_DAYS) mature++;
       else young++;
@@ -92,7 +108,7 @@ const App = {
     const daysForNew = Math.ceil(newCount / Math.max(1, this.settings.newPerDay));
     const readinessDays = daysForNew + 14; // 2 hafta pekiştirme tamponu
     const readinessDate = new Date(now + readinessDays * 86400000);
-    return { due, learning, newCount, newToday, mature, young, seen, masteredTotal, total: QUESTIONS.length, readinessDate, readinessDays };
+    return { due, learning, newCount, newToday, mature, young, seen, masteredTotal, learnedCount, total: QUESTIONS.length, readinessDate, readinessDays };
   },
 
   async streak() {
@@ -112,11 +128,16 @@ const App = {
     return streak;
   },
 
-  /* ---------- çalışma kuyruğu ----------
-   * Blok modeli: TEKRARLAR kilidi açık tüm bloklardan gelir (aralıklı tekrar
-   * blok sınırlarını aşar), YENİ kartlar yalnız aktif bloktan tanıtılır.
-   * Kuyruk her zaman karışık (interleaving) — asla kategori bloklaması yok. */
-  async buildStudyQueue({ blockId = null } = {}) {
+  /* ---------- çalışma kuyrukları ----------
+   * İKİ AYRI FAZ (5 Tem — "10./14. soru karmaşası"nın çözümü):
+   *   teach : bugünün yeni kartları (yalnız aktif bloktan), kaldıraç
+   *           öncelik sırasıyla — önce ÖĞRETİLİR.
+   *   review: tekrarı gelen kartlar (kilidi açık tüm bloklardan) — ÖĞRET
+   *           fazı bitince, net bir geçiş ekranının ardından TEST edilir.
+   *           Bugün öğretilenler de oturum sonunda bu faza eklenir.
+   * "Öğrendim" işaretli kartlar çalışma rotasyonuna girmez (blok testi ve
+   * sınav sormaya devam eder; yanlışta bayrak düşer). */
+  async buildStudyQueues({ blockId = null } = {}) {
     const map = await this.cards();
     const now = Date.now();
     const states = await Blocks.getAllStates();
@@ -124,19 +145,23 @@ const App = {
     const block = blockId ? Blocks.byId(blockId) : await Blocks.current();
     const newPool = block ? block.ids : [];
 
-    const dueCards = QUESTIONS.filter(q => unlockedIds.has(q.id) && SRS.isDue(map.get(q.id), now));
-    /* Yeni kartlar kaldıraç önceliğiyle tanıtılır (freq.js): tek ezberle çok
-     * soru açan ve resmî çekirdek sorular önce gelir. */
-    const newCandidates = QUESTIONS.filter(q => newPool.includes(q.id) && map.get(q.id).state === "new");
-    const newCards = (typeof FREQ !== "undefined" ? FREQ.orderNew(newCandidates) : newCandidates)
+    const review = QUESTIONS.filter(q => {
+      const c = map.get(q.id);
+      return unlockedIds.has(q.id) && !c.learned && SRS.isDue(c, now);
+    });
+    for (let i = review.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [review[i], review[j]] = [review[j], review[i]];
+    }
+
+    const newCandidates = QUESTIONS.filter(q => {
+      const c = map.get(q.id);
+      return newPool.includes(q.id) && c.state === "new" && !c.learned;
+    });
+    const teach = (typeof FREQ !== "undefined" ? FREQ.orderNew(newCandidates) : newCandidates)
       .slice(0, this.settings.newPerDay);
 
-    const queue = [...dueCards, ...newCards];
-    for (let i = queue.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [queue[i], queue[j]] = [queue[j], queue[i]];
-    }
-    return queue;
+    return { teach, review };
   },
 
   /* ---------- sınav soru seçimi (zayıflık + yıldız ağırlıklı) ---------- */

@@ -4,7 +4,7 @@
  * ========================================================================= */
 "use strict";
 
-const CACHE = "us-citizenship-v8";
+const CACHE = "us-citizenship-v9";
 
 const ASSETS = [
   "./",
@@ -32,6 +32,7 @@ const ASSETS = [
   "./js/coach.js",
   "./js/selfcheck.js",
   "./js/ui.js",
+  "./js/karaoke.js",
   "./js/views/welcome.js",
   "./js/views/home.js",
   "./js/views/study.js",
