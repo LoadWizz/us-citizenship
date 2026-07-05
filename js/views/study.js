@@ -1,14 +1,22 @@
 /* =========================================================================
- * views/study.js — Çalışma modu: aktif hatırlama + aralıklı tekrar
+ * views/study.js — Çalışma: ÖĞRET + HATIRLA modları
  *
- * Bilingual akış (langMode="bilingual"):
- *   1) Türkçe soru (renkli ipucu) gösterilir ve okunur — ANLAM önce
- *   2) İngilizce soru (renkli ipucu) gösterilir ve okunur — SINAV DİLİ sonra
- *   3) Kullanıcı sesli/zihinsel cevaplar → çevirir → kendini notlar
- * EN modda yalnız İngilizce. Cevaplar her zaman İngilizce esaslı;
- * bilingual modda altlarında Türkçe karşılık.
+ * İLKE: Çalış bölümü TEST ETMEZ, ÖĞRETİR. Hiç görülmemiş soru önce
+ * öğretilir; test yalnız daha önce öğretilmiş kartlara yapılır.
  *
- * Renkli ipucu = Von Restorff izolasyonu: kartta YALNIZ ipucu öbeği renkli.
+ * ÖĞRET modu (kart hiç görülmemişse):
+ *   1) Türkçe soru (görsel + sesli) — anlam önce
+ *   2) İngilizce soru — ezberlenecek kelimeler RENKLİ + "bu kelimelere
+ *      dikkat" tek satırı (göstererek anlatma)
+ *   3) Cevap DOĞRUDAN verilir: kocaman renkli İngilizce cevap + altında
+ *      Türkçesi. Sesli: Türkçe cevap → İngilizce cevap.
+ *   4) Tek buton: "Devam". Kart aynı oturumun sonuna eklenir → birazdan
+ *      HATIRLA modunda geri gelir (öğren → dakikalar içinde test).
+ *
+ * HATIRLA modu (kart daha önce görülmüşse): klasik aktif hatırlama —
+ * soru → (sesli/zihinsel cevap) → cevabı göster → kendini notla.
+ *
+ * Ekranda İÇ JARGON YOK: soru numarası, kategori, yıldız rozetleri yok.
  * ========================================================================= */
 "use strict";
 
@@ -21,7 +29,6 @@ const StudyView = {
     this.freeMode = false;
     const block = this.targetBlock ? Blocks.byId(this.targetBlock) : await Blocks.current();
     this.queue = await App.buildStudyQueue({ blockId: block ? block.id : null });
-    this.activeBlockName = block ? `${block.icon} ${block.name}` : "";
     this.idx = 0;
     this.sessionDone = 0;
 
@@ -29,7 +36,7 @@ const StudyView = {
       root.appendChild(h("div", { class: "page center-page" },
         h("div", { class: "big-emoji" }, "🎉"),
         h("h2", {}, "Bugünlük bitti!"),
-        h("p", { class: "muted" }, "Vadesi gelen kart yok. Blok sınavına girebilir veya serbest tekrar yapabilirsin."),
+        h("p", { class: "muted" }, "Tekrar edilecek kart yok. Blok sınavına girebilir veya serbest tekrar yapabilirsin."),
         block ? h("button", { class: "btn btn-primary btn-big", onclick: () => { App.selectedBlock = block.id; UI.navigate("/block"); } }, `${block.icon} ${block.name} bloğuna git`) : null,
         h("button", { class: "btn btn-outline btn-big", onclick: () => this.freeSession() }, "🔁 Serbest Tekrar (20 kart)"),
         h("button", { class: "btn btn-ghost", onclick: () => UI.navigate("/home") }, "← Ana sayfa")
@@ -54,7 +61,7 @@ const StudyView = {
     this.renderCard();
   },
 
-  renderCard() {
+  async renderCard() {
     const { h } = UI;
     const root = this.root;
     root.innerHTML = "";
@@ -76,38 +83,111 @@ const StudyView = {
     }
 
     const q = this.queue[this.idx];
+    const card = (await App.cards()).get(q.id);
+    const isNew = !card || card.seen === 0;
+
+    if (isNew) this.renderTeach(q);
+    else this.renderRecall(q);
+  },
+
+  /* ---------- ortak üst çubuk: yalnız ilerleme, jargon yok ---------- */
+  topBar() {
+    const { h } = UI;
+    return [
+      h("div", { class: "study-top" },
+        h("button", { class: "btn btn-ghost small-btn", onclick: () => { this.targetBlock = null; UI.navigate("/home"); } }, "← Çık"),
+        h("span", { class: "muted" }, `${this.idx + 1} / ${this.queue.length}`),
+        h("span", { style: { width: "52px" } })),
+      h("div", { class: "progressbar" }, h("div", { class: "progressbar-fill", style: { width: `${(this.idx / this.queue.length) * 100}%` } }))
+    ];
+  },
+
+  /* Parantezleri metinden arındır (sesli okuma için) */
+  cleanForSpeech(s) { return s.replace(/[()]/g, "").replace(/\s+/g, " ").trim(); },
+
+  /* ================= ÖĞRET modu ================= */
+  renderTeach(q) {
+    const { h } = UI;
+    const root = this.root;
+    const bilingual = App.isBilingual();
+    const nat = Lang.native(q, "tr");
+    const cue = CUES[q.id];
+    const pairs = Lang.answerPairs(q, App.settings.officials, "tr");
+    const heroes = pairs.filter(p => p.best);
+    const heroList = heroes.length ? heroes : pairs;
+
+    root.appendChild(h("div", { class: "page" },
+      ...this.topBar(),
+      h("div", { class: "teach-label" }, "🆕 Yeni soru — önce öğren"),
+
+      h("div", { class: "card qcard" },
+        q.dyn ? UI.dynBadge() : null,
+        (bilingual && nat) ? h("div", { class: "qtext qtext-native", lang: "tr", html: Lang.qHTMLNative(q, "tr") }) : null,
+        h("div", { class: `qtext ${bilingual && nat ? "qtext-en-second" : ""}`, lang: "en", html: Lang.qHTMLEn(q) }),
+        h("div", { class: "attention-line" },
+          "👀 Bu kelimelere dikkat: ",
+          h("span", { class: `cue cue-${q.cat}` }, cue),
+          " — bunu duyduğunda cevap aklına gelsin."),
+        h("div", { class: "qcontrols" },
+          Speech.ttsAvailable ? h("button", { class: "btn btn-circle", title: "Tekrar dinle", onclick: () => this.speakTeach(q, heroList) }, "🔊") : null)),
+
+      UI.answerCard(q, { natLang: "tr" }),
+
+      h("button", {
+        class: "btn btn-primary btn-big",
+        onclick: async () => {
+          /* Öğretilen kart sessizce zamanlanır (SRS: İyi) ve oturum sonunda
+           * HATIRLA modunda geri gelir — öğren → dakikalar içinde test */
+          await App.gradeCard(q.id, 2, { enMode: !App.isBilingual() });
+          this.sessionDone++;
+          this.queue.push(q);
+          this.idx++;
+          this.renderCard();
+        }
+      }, "Devam →")
+    ));
+
+    if (App.settings.autoTTS && Speech.ttsAvailable) this.speakTeach(q, heroList);
+  },
+
+  /* Öğretim ses akışı: TR soru → EN soru → TR cevap → EN cevap */
+  speakTeach(q, heroList) {
+    const parts = [];
+    const nat = App.isBilingual() ? Lang.native(q, "tr") : null;
+    if (nat) parts.push({ text: nat.q, lang: "tr" });
+    parts.push({ text: q.q, lang: "en" });
+    const first = heroList[0];
+    if (first) {
+      const trAns = first.nat || first.en; // TR karşılık yoksa (isimler) aynen
+      if (App.isBilingual()) parts.push({ text: "Cevap: " + this.cleanForSpeech(trAns), lang: "tr" });
+      parts.push({ text: this.cleanForSpeech(first.en), lang: "en" });
+    }
+    Speech.speakSequence(parts, { rate: App.settings.ttsRate });
+  },
+
+  /* ================= HATIRLA modu ================= */
+  renderRecall(q) {
+    const { h } = UI;
+    const root = this.root;
     const bilingual = App.isBilingual();
     const answers = effectiveAnswers(q, App.settings.officials);
     this.lastSpeechMatch = undefined;
+    const natHTML = bilingual ? Lang.qHTMLNative(q, "tr") : null;
 
     const speechStatus = h("div", { class: "speech-status", id: "speech-status" });
-
-    /* Soru kartı: bilingual modda ÖNCE Türkçe, SONRA İngilizce */
-    const natHTML = bilingual ? Lang.qHTMLNative(q, "tr") : null;
-    const front = h("div", { class: "card qcard" },
-      h("div", { class: "qmeta" },
-        h("span", { class: "qnum" }, `#${q.id}`),
-        UI.catBadge(q.cat),
-        q.star ? h("span", { class: "badge badge-star" }, "★ Çekirdek") : null),
-      q.dyn ? UI.dynBadge() : null,
-      natHTML ? h("div", { class: "qtext qtext-native", lang: "tr", html: natHTML }) : null,
-      h("div", { class: `qtext ${natHTML ? "qtext-en-second" : ""}`, lang: "en", html: Lang.qHTMLEn(q) }),
-      h("div", { class: "qcontrols" },
-        Speech.ttsAvailable ? h("button", { class: "btn btn-circle", title: "Soruyu dinle", onclick: () => this.speakQuestion(q) }, "🔊") : null,
-        Speech.micUsable() ? h("button", { class: "btn btn-circle", id: "mic-btn", title: "İngilizce sesli cevapla", onclick: () => this.listenAnswer(q, answers) }, "🎤") : null),
-      speechStatus
-    );
-
     const answerArea = h("div", { id: "answer-area" },
       h("button", { class: "btn btn-primary btn-big", onclick: () => this.reveal(q, answers) }, "Cevabı Göster"));
 
     root.appendChild(h("div", { class: "page" },
-      h("div", { class: "study-top" },
-        h("button", { class: "btn btn-ghost small-btn", onclick: () => { this.targetBlock = null; UI.navigate("/home"); } }, "← Çık"),
-        h("span", { class: "muted" }, `${this.activeBlockName ? this.activeBlockName + " · " : ""}${this.idx + 1} / ${this.queue.length}`),
-        h("span", { style: { width: "52px" } })),
-      h("div", { class: "progressbar" }, h("div", { class: "progressbar-fill", style: { width: `${(this.idx / this.queue.length) * 100}%` } })),
-      front,
+      ...this.topBar(),
+      h("div", { class: "card qcard" },
+        q.dyn ? UI.dynBadge() : null,
+        natHTML ? h("div", { class: "qtext qtext-native", lang: "tr", html: natHTML }) : null,
+        h("div", { class: `qtext ${natHTML ? "qtext-en-second" : ""}`, lang: "en", html: Lang.qHTMLEn(q) }),
+        h("div", { class: "qcontrols" },
+          Speech.ttsAvailable ? h("button", { class: "btn btn-circle", title: "Soruyu dinle", onclick: () => this.speakQuestion(q) }, "🔊") : null,
+          Speech.micUsable() ? h("button", { class: "btn btn-circle", id: "mic-btn", title: "İngilizce sesli cevapla", onclick: () => this.listenAnswer(q, answers) }, "🎤") : null),
+        speechStatus),
       answerArea
     ));
     UI.tapGuard(answerArea);
@@ -115,7 +195,6 @@ const StudyView = {
     if (App.settings.autoTTS && Speech.ttsAvailable) this.speakQuestion(q);
   },
 
-  /* Bilingual: önce Türkçe soru, ardından İngilizce; EN modda yalnız İngilizce */
   speakQuestion(q) {
     const parts = [];
     if (App.isBilingual()) {
@@ -152,7 +231,7 @@ const StudyView = {
       onError: (err) => {
         status.textContent = Speech.sttErrorMessage(err);
         mic.classList.remove("listening");
-        if (!Speech.micUsable()) mic.style.display = "none"; // izin yok → butonu kaldır
+        if (!Speech.micUsable()) mic.style.display = "none";
       },
       onEnd: () => { const m = document.getElementById("mic-btn"); if (m) m.classList.remove("listening"); }
     });
@@ -164,10 +243,7 @@ const StudyView = {
     area.innerHTML = "";
     UI.tapGuard(area);
 
-    const pairs = Lang.answerPairs(q, App.settings.officials, App.nativeLang());
-    const hasBest = pairs.some(p => p.best);
-    /* Not butonlarında GERÇEK süreler: bu kart için her notun kartı ne zaman
-     * geri getireceği hesaplanır ("kısa/uzun" yerine somut bilgi) */
+    /* Not butonlarında GERÇEK süreler (bu kartın geçmişine göre) */
     const cardState = (await App.cards()).get(q.id) || SRS.newCard(q.id);
     const ivs = SRS.previewIntervals(cardState);
     const grades = [
@@ -177,28 +253,18 @@ const StudyView = {
       { g: 3, label: "Kolay", sub: SRS.fmtInterval(ivs[3]), cls: "grade-easy" }
     ];
 
-    area.appendChild(h("div", { class: "card acard" },
-      h("div", { class: "alabel" }, hasBest ? "Kabul edilen cevaplar — renkli olanı ezberle:" : "Kabul edilen cevap(lar):"),
-      h("ul", { class: "alist" }, pairs.map(p =>
-        h("li", { lang: "en", class: p.best ? "a-best-li" : "" },
-          p.best
-            ? h("span", { class: `a-best cue-${q.cat}` }, p.en)
-            : p.en,
-          p.best ? h("span", { class: "best-tag" }, "en kolayı") : null,
-          p.nat ? h("div", { class: "a-nat", lang: "tr" }, p.nat) : null))),
-      q.note ? h("div", { class: "anote muted small" }, "ℹ️ " + q.note) : null,
-      h("div", { class: "trbox" },
-        h("div", { class: "tr-explain" }, "🇹🇷 " + q.tr),
-        h("div", { class: "tr-hook" }, "🧠 " + q.hook)),
-      this.lastSpeechMatch === true ? h("div", { class: "speech-status ok" }, "🎤 Sesli cevabın eşleşmişti — 'İyi' veya 'Kolay' seç") : null
-    ));
+    area.appendChild(UI.answerCard(q, { natLang: App.nativeLang() }));
 
-    /* İlk kullanımda not butonlarının ne işe yaradığını TEK SEFER anlat */
+    if (this.lastSpeechMatch === true) {
+      area.appendChild(h("div", { class: "speech-status ok" }, "🎤 Sesli cevabın eşleşmişti — 'İyi' veya 'Kolay' seç"));
+    }
+
+    /* İlk kullanımda not butonlarını TEK SEFER anlat */
     if (!App.settings.gradeHelpSeen) {
       const helpCard = h("div", { class: "card grade-help" },
         h("b", {}, "Bu 4 düğme ne işe yarar?"),
         h("p", { class: "small", style: { margin: "6px 0" } },
-          "Ne kadar iyi bildiğini SEN söylersin; uygulama kartı ona göre tam zamanında tekrar sorar (unutma eğrisi bilimi). Düğmenin altındaki süre = kartın ne zaman geri geleceği."),
+          "Ne kadar iyi bildiğini SEN söylersin; uygulama kartı ona göre tam zamanında tekrar sorar. Düğmenin altındaki süre = kartın ne zaman geri geleceği."),
         h("ul", { class: "small", style: { margin: "0 0 8px", paddingLeft: "18px" } },
           h("li", {}, h("b", {}, "Tekrar"), " — bilemedim, birazdan yine sor"),
           h("li", {}, h("b", {}, "Zor"), " — bildim ama zorlandım"),
@@ -215,11 +281,10 @@ const StudyView = {
       grades.map(x => h("button", {
         class: `btn grade-btn ${x.cls}`,
         onclick: async () => {
-          /* EN-only modda tüm çalışma İngilizce bağlamdır → ustalık günlüğü işler */
           await App.gradeCard(q.id, x.g, { enMode: !App.isBilingual() });
           this.lastSpeechMatch = undefined;
           this.sessionDone++;
-          if (x.g === 0) this.queue.push(q); // Tekrar → oturum sonuna geri koy
+          if (x.g === 0) this.queue.push(q);
           this.idx++;
           this.renderCard();
         }
@@ -229,8 +294,8 @@ const StudyView = {
     if (Speech.ttsAvailable) {
       area.appendChild(h("button", {
         class: "btn btn-ghost", style: { marginTop: "8px" },
-        onclick: () => Speech.speak(Lang.speakableAnswers(q, App.settings.officials).join(". "), { lang: "en", rate: App.settings.ttsRate })
-      }, hasBest ? "🔊 En kolay cevabı dinle" : "🔊 Cevabı dinle (İngilizce)"));
+        onclick: () => Speech.speak(this.cleanForSpeech(Lang.speakableAnswers(q, App.settings.officials).join(". ")), { lang: "en", rate: App.settings.ttsRate })
+      }, "🔊 Cevabı dinle"));
     }
   }
 };

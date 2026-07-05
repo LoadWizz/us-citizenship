@@ -37,8 +37,8 @@ const PRICING = {
 
   plans: {
     free: {
-      id: "free", name: "Ücretsiz", tagline: "Çekirdek ★20 ile başla",
-      features: ["Blok 1: Çekirdek ★20 soru", "İki dilli kartlar + renkli ipuçları", "Sesli çalışma (TTS/mikrofon)", "Açık bloklardan mini deneme"]
+      id: "free", name: "Ücretsiz", tagline: "En Önemli 20 soruyla başla",
+      features: ["Blok 1: En Önemli 20 Soru", "İki dilli kartlar + renkli ipuçları", "Sesli çalışma (TTS/mikrofon)", "Açık bloklardan mini deneme"]
     },
     prep: {
       id: "prep", name: "Hazırlık", tagline: "Tüm sorular, tam yol haritası",

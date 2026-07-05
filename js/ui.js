@@ -117,6 +117,28 @@ const UI = (() => {
     return new Date(d).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" });
   }
 
+  /* Sade cevap kartı — "göstererek anlat" ilkesi:
+   * EN KOLAY cevap kocaman ve renkli (soru ipucusuyla aynı kategori rengi),
+   * altında tek satır Türkçe karşılığı; diğer kabul edilenler küçük ve sönük.
+   * Etiket/jargon yok. Tüm görünümler (çalış/sınav/blok) bunu kullanır. */
+  function answerCard(q, { natLang = null } = {}) {
+    const pairs = Lang.answerPairs(q, App.settings.officials, natLang);
+    const heroes = pairs.filter(p => p.best);
+    const heroList = heroes.length ? heroes : pairs;      // best yoksa hepsi hero
+    const others = heroes.length ? pairs.filter(p => !p.best) : [];
+
+    return h("div", { class: "card acard" },
+      heroList.map(p => h("div", { class: "answer-hero" },
+        h("div", { class: `hero-text cue-${q.cat}`, lang: "en" }, p.en),
+        p.nat ? h("div", { class: "hero-nat", lang: "tr" }, p.nat) : null)),
+      others.length ? h("div", { class: "answer-others" },
+        h("div", { class: "others-label" }, "Bunlar da kabul edilir:"),
+        h("ul", { class: "others-list", lang: "en" },
+          others.map(p => h("li", {}, p.en)))) : null,
+      q.dyn ? dynBadge() : null,
+      q.note ? h("div", { class: "anote muted small" }, "ℹ️ " + q.note) : null);
+  }
+
   /* Hayalet dokunuş koruması: yeni çizilen aksiyon alanını kısa süre kilitle.
    * Bir önceki ekranda aynı noktaya denk gelen dokunuşun ikinci yarısının
    * yeni butonu tetiklemesini engeller. */
@@ -127,5 +149,5 @@ const UI = (() => {
     return el;
   }
 
-  return { h, esc, toast, register, navigate, renderRoute, openSheet, closeSheet, dynBadge, starBadge, catBadge, progressRing, fmtDate, tapGuard };
+  return { h, esc, toast, register, navigate, renderRoute, openSheet, closeSheet, dynBadge, starBadge, catBadge, progressRing, fmtDate, tapGuard, answerCard };
 })();

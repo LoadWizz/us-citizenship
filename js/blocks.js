@@ -19,7 +19,7 @@
 "use strict";
 
 const BLOCKS = [
-  { id: 1, name: "Çekirdek", icon: "★",  desc: "Resmi yıldızlı 20 soru — 65/20 alt kümesi. Buradan başla.",
+  { id: 1, name: "En Önemli 20", icon: "★",  desc: "Resmî listede yıldızla işaretli 20 temel soru. Buradan başla.",
     ids: [2, 7, 12, 20, 30, 36, 38, 39, 44, 52, 61, 66, 74, 78, 86, 94, 113, 115, 121, 126] },
   { id: 2, name: "Anayasa & İlkeler", icon: "📜", desc: "Anayasa, Bağımsızlık Bildirgesi ve temel ilkeler.",
     ids: [1, 3, 4, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 37, 60, 63, 82, 97] },

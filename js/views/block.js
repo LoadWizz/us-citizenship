@@ -171,10 +171,6 @@ const BlockTestView = {
         h("span", { class: "muted" }, `eşik: ${Blocks.passNeed(s.pool.length)}`),
         h("span", { class: "fail" }, `✗ ${s.wrong}`)) : null,
       h("div", { class: "card qcard" },
-        h("div", { class: "qmeta" },
-          h("span", { class: "qnum" }, `#${q.id}`),
-          UI.catBadge(q.cat),
-          s.mode === "seal" ? h("span", { class: "badge badge-seal" }, "EN only") : null),
         natHTML ? h("div", { class: "qtext qtext-native", lang: "tr", html: natHTML }) : null,
         h("div", { class: `qtext ${natHTML ? "qtext-en-second" : ""}`, lang: "en", html: Lang.qHTMLEn(q) }),
         h("div", { class: "qcontrols" },
@@ -235,16 +231,10 @@ const BlockTestView = {
     area.innerHTML = "";
     UI.tapGuard(area);
 
-    const pairs = Lang.answerPairs(q, App.settings.officials, s.enOnly ? null : App.nativeLang());
-    const hasBest = pairs.some(p => p.best);
-    area.appendChild(h("div", { class: "card acard" },
-      h("div", { class: "alabel" }, hasBest ? "Kabul edilen cevaplar — renkli olanı ezberle:" : "Kabul edilen cevap(lar):"),
-      h("ul", { class: "alist" }, pairs.map(p =>
-        h("li", { lang: "en", class: p.best ? "a-best-li" : "" },
-          p.best ? h("span", { class: `a-best cue-${q.cat}` }, p.en) : p.en,
-          p.best ? h("span", { class: "best-tag" }, "en kolayı") : null,
-          p.nat ? h("div", { class: "a-nat", lang: "tr" }, p.nat) : null))),
-      s.speechMatch ? h("div", { class: "speech-status ok" }, "🎤 Sesli cevabın kabul edildi") : null));
+    area.appendChild(UI.answerCard(q, { natLang: s.enOnly ? null : App.nativeLang() }));
+    if (s.speechMatch) {
+      area.appendChild(h("div", { class: "speech-status ok" }, "🎤 Sesli cevabın kabul edildi"));
+    }
 
     const mark = async (correct) => {
       correct ? s.correct++ : s.wrong++;

@@ -108,10 +108,6 @@ const ExamView = {
       s.limitedPool && s.idx === 0 ? h("div", { class: "badge badge-warn" },
         "Ücretsiz sürümde sorular yalnız açık bloklardan gelir — tam 128'lik havuz Premium'da") : null,
       h("div", { class: "card qcard" },
-        h("div", { class: "qmeta" },
-          h("span", { class: "qnum" }, `#${q.id}`),
-          UI.catBadge(q.cat),
-          q.star ? h("span", { class: "badge badge-star" }, "★") : null),
         h("div", { class: "qtext", lang: "en", html: Lang.qHTMLEn(q) }),
         h("div", { class: "qcontrols" },
           Speech.ttsAvailable ? h("button", { class: "btn btn-circle", onclick: () => Speech.speak(q.q, { rate: App.settings.ttsRate }) }, "🔊") : null),
@@ -170,17 +166,10 @@ const ExamView = {
 
     const speech = s.answeredBySpeech;
 
-    const pairs = Lang.answerPairs(q, App.settings.officials, null);
-    const hasBest = pairs.some(p => p.best);
-    area.appendChild(h("div", { class: "card acard" },
-      h("div", { class: "alabel" }, hasBest ? "Kabul edilen cevaplar — renkli olanı ezberle:" : "Kabul edilen cevap(lar):"),
-      h("ul", { class: "alist", lang: "en" }, pairs.map(p =>
-        h("li", { class: p.best ? "a-best-li" : "" },
-          p.best ? h("span", { class: `a-best cue-${q.cat}` }, p.en) : p.en,
-          p.best ? h("span", { class: "best-tag" }, "en kolayı") : null))),
-      q.dyn ? UI.dynBadge() : null,
-      speech && speech.match ? h("div", { class: "speech-status ok" }, "🎤 Sesli cevabın kabul edildi") : null
-    ));
+    area.appendChild(UI.answerCard(q, { natLang: null })); // sınav salt İngilizce
+    if (speech && speech.match) {
+      area.appendChild(h("div", { class: "speech-status ok" }, "🎤 Sesli cevabın kabul edildi"));
+    }
 
     const mark = async (correct) => {
       clearInterval(s.timerId);

@@ -19,8 +19,8 @@ const PaywallView = {
     const b1m = Blocks.masteryOf(b1, cards);
     const b1st = await Blocks.getState(1);
     const progressLine = b1st.status === "sealed"
-      ? "★ Çekirdek 20'yi MÜHÜRLEDİN — en zor kısmı bitirdin."
-      : `★ Çekirdek bloğunda ${b1m.seen}/20 soruyu gördün.`;
+      ? "★ En Önemli 20'yi TAMAMLADIN — en zor kısmı bitirdin."
+      : `★ En Önemli 20'nin ${b1m.seen} tanesini gördün.`;
 
     root.appendChild(h("div", { class: "page" },
       h("div", { class: "study-top" },
