@@ -121,17 +121,21 @@ const StudyView = {
       steps
     ));
 
-    /* ---- Adım: Türkçe soru ---- */
+    /* ---- Adım 1: SADECE Türkçe soru + eş zamanlı sesli okuma ----
+     * (6 Tem — Erkan: "ekrana sadece türkçe soru getir, sadece türkçe metin,
+     * eş zamanlı sesli okuma, altında soruyu İngilizce sor BUTONU") */
     const stepTR = () => {
+      const kTR = Karaoke.line(nat.q, { cue: nat.cue, cat: q.cat });
       const box = h("div", { class: "card qcard" },
         q.dyn ? UI.dynBadge() : null,
-        h("div", { class: "qtext qtext-native", lang: "tr", html: Lang.qHTMLNative(q, "tr") }),
-        h("div", { class: "step-btns" },
-          (Speech.ttsAvailable && Speech.hasVoice("tr") && nat)
-            ? h("button", { class: "btn btn-outline", onclick: () => Speech.speak(nat.q, { lang: "tr", rate: App.settings.ttsRate }) }, "🔊 Türkçe dinle")
-            : null,
-          h("button", { class: "btn btn-primary", onclick: () => { Speech.stopSpeaking(); stepEN(); } }, "🇺🇸 İngilizce sor →")));
+        h("div", { class: "qtext qtext-native", lang: "tr" }, kTR.el),
+        h("button", {
+          class: "btn btn-primary btn-big",
+          onclick: () => { Karaoke.stop(kTR); stepEN(); }
+        }, "Soruyu İngilizce Sor →"));
       steps.appendChild(box);
+      /* kart açılır açılmaz Türkçe okunur; şerit metni kelime kelime izler */
+      Karaoke.play(kTR, { lang: "tr", rate: App.settings.ttsRate });
       UI.tapGuard(box);
     };
 
@@ -140,8 +144,8 @@ const StudyView = {
       this.kara = Karaoke.line(q.q, { cue, cat: q.cat });
       const listenBtnRow = h("div", { class: "step-btns", id: "teach-listen-row" },
         Speech.ttsAvailable
-          ? h("button", { class: "btn btn-primary", onclick: () => playQuestion() }, "🔊 Sesli oku")
-          : h("button", { class: "btn btn-primary", onclick: () => stepAnswer() }, "Cevabı ver →"));
+          ? h("button", { class: "btn btn-primary", onclick: () => playQuestion() }, "Sesli Oku")
+          : h("button", { class: "btn btn-primary", onclick: () => stepAnswer() }, "Cevabı Ver →"));
       const box = h("div", { class: "card qcard" },
         h("div", { class: "qtext", lang: "en" }, this.kara.el),
         h("div", { class: "attention-line" },
@@ -169,8 +173,8 @@ const StudyView = {
       const row = document.getElementById("teach-listen-row");
       if (!row) return;
       row.innerHTML = "";
-      row.appendChild(UI.h("button", { class: "btn btn-outline", onclick: () => playQuestion() }, "🔁 Soruyu tekrar dinle"));
-      row.appendChild(UI.h("button", { class: "btn btn-primary", onclick: () => stepAnswer() }, "Cevabı ver →"));
+      row.appendChild(UI.h("button", { class: "btn btn-outline", onclick: () => playQuestion() }, "Soruyu Tekrar Dinle"));
+      row.appendChild(UI.h("button", { class: "btn btn-primary", onclick: () => stepAnswer() }, "Cevabı Ver →"));
       UI.tapGuard(row);
     };
 
@@ -201,9 +205,9 @@ const StudyView = {
         q.dyn ? UI.dynBadge() : null,
         q.note ? UI.h("div", { class: "anote muted small" }, "ℹ️ " + q.note) : null,
         UI.h("div", { class: "step-btns" },
-          Speech.ttsAvailable ? UI.h("button", { class: "btn btn-outline", onclick: () => playAnswers(0) }, "🔊 Cevabı dinle") : null,
+          Speech.ttsAvailable ? UI.h("button", { class: "btn btn-outline", onclick: () => playAnswers(0) }, "Cevabı Dinle") : null,
           (Speech.ttsAvailable && Speech.hasVoice("tr") && natTexts.length)
-            ? UI.h("button", { class: "btn btn-ghost", onclick: () => Speech.speak(natTexts.join(". "), { lang: "tr", rate: App.settings.ttsRate }) }, "🔊 Türkçesini dinle")
+            ? UI.h("button", { class: "btn btn-outline", onclick: () => Speech.speak(natTexts.join(". "), { lang: "tr", rate: App.settings.ttsRate }) }, "Türkçesini Dinle")
             : null));
 
       steps.appendChild(box);
@@ -222,7 +226,7 @@ const StudyView = {
         }
       }, "Devam →"));
       const row = document.getElementById("teach-listen-row");
-      if (row) row.querySelectorAll(".btn").forEach(b => { if (b.textContent.includes("Cevabı ver")) b.disabled = true; });
+      if (row) row.querySelectorAll(".btn").forEach(b => { if (b.textContent.includes("Cevabı Ver")) b.disabled = true; });
       box.scrollIntoView({ behavior: "smooth", block: "start" });
       UI.tapGuard(box);
     };

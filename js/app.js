@@ -239,9 +239,20 @@ const App = {
     window.addEventListener("hashchange", UI.renderRoute);
     await UI.renderRoute();
 
+    /* Yeni sürüm yayınlandığında kullanıcı ESKİDE KALMAZ (6 Tem):
+     * yeni SW devreye girer girmez sayfa BİR KEZ kendini yeniler —
+     * kullanıcı uygulamayı açtığında hep son sürümü görür. */
     if ("serviceWorker" in navigator) {
-      try { await navigator.serviceWorker.register("sw.js"); }
-      catch (e) { console.warn("SW kaydı başarısız (http üzerinden normaldir):", e.message); }
+      try {
+        let refreshed = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (refreshed) return;
+          refreshed = true;
+          location.reload();
+        });
+        const reg = await navigator.serviceWorker.register("sw.js");
+        reg.update().catch(() => {});
+      } catch (e) { console.warn("SW kaydı başarısız (http üzerinden normaldir):", e.message); }
     }
   }
 };

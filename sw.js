@@ -4,7 +4,7 @@
  * ========================================================================= */
 "use strict";
 
-const CACHE = "us-citizenship-v9";
+const CACHE = "us-citizenship-v10";
 
 const ASSETS = [
   "./",
