@@ -15,7 +15,7 @@
 
 const Lang = (() => {
   const PACKS = { tr: (typeof LANG_TR !== "undefined") ? LANG_TR : {} };
-  /* Gelecek: PACKS.es = LANG_ES (lang-es.js yüklenince) */
+  if (typeof LANG_ES !== "undefined") PACKS.es = LANG_ES;
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));

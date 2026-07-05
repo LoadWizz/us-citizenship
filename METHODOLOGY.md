@@ -24,6 +24,36 @@ Dunlosky ve ark. 2013 derlemesi (Improving Students' Learning...) pratik test et
 ve aralıklı tekrarı "yüksek fayda" olarak sınıflar — bu ikisi uygulamanın motorudur;
 imgelem/anahtar kelime teknikleri destekleyici katmandır (renkli ipucu), motor değildir.
 
+## Sorulma olasılığı katmanı (freq.js — 4 Tem 2026 araştırması)
+
+**Soru: "En çok sorulan sorular hangileri?"** — Erkan'ın isteğiyle arşiv/veri taraması yapıldı.
+
+**Bulgu 1 — seçim rastgeledir.** USCIS Politika El Kitabı (Cilt 12, Kısım E, Bölüm 2):
+sınav soruları *"a USCIS system randomly selects the test questions"* — memur sistemin
+ürettiği standart formdan okur. 2025 testinde de aynı mekanizma (20 soru çekilir,
+12 doğruda veya 9 yanlışta durur). Dolayısıyla **"memurların en çok sorduğu soru"
+diye resmî bir dağılım yoktur**; her sorunun çekilme olasılığı ~20/128 ≈ %16'dır.
+Hazırlık sitelerindeki "en sık çıkan 10 soru" listeleri anekdottur (hatırlanabilirlik
+yanlılığı); 2025 testi için saha verisi henüz istatistiksel anlam taşımayacak kadar az.
+
+**Bulgu 2 — tek resmî öncelik 65/20 ★listesi.** USCIS'in kendisi 20 soruyu yıldızlar
+(65 yaş + 20 yıl GC: yalnız bu 20'den 10 soru, 6 doğru, istediği dilde). Bu, USCIS'in
+"çekirdek bilgi" tanımıdır → Blok 1.
+
+**Sonuç — dürüst optimizasyon "tahmin" değil "beklenen değer"dir.** Seçim rastgele
+olduğuna göre kazanç, hangi sorunun geleceğini bilmekte değil, EN AZ EMEKLE EN ÇOK
+SORUYU cevaplar hale gelmektedir. freq.js bunu üç katmanla kodlar:
+
+| Katman | Gerekçe |
+|---|---|
+| ★20 önce (Blok 1 + tanıtım önceliği +3) | USCIS'in kendi çekirdek seçkisi |
+| Kaldıraç kümeleri: aynı cevap birden çok soruda ("The President" 5 soru, "Declaration of Independence" 4, "Civil War" 3, "communism" 2, "Freed the slaves" 2, "Required by law" 2) + tek-hikâye kümeleri (yetkililer 8 soru, oy hakkı zinciri, bayrak çifti, Memorial/Veterans tuzağı, WWII üçlüsü) | Bir ezber → N soru: beklenen doğru/emek oranını maksimize eder; ÖĞRET kartında tek satır notla gösterilir (Gestalt/örgütleme: ilişkili öğeler birlikte kodlanınca hatırlama artar — Bower ve ark. 1969 kümeleme) |
+| Tek cevaplı kısa sorular önce (+1) | Sınav 12 doğruda biter: hızlı-kesin cevaplar tabanı kurar, riskli sorulara sıra gelmeden sınav biter (Hick yasası: seçenek azlığı = hız) |
+
+Kaynaklar: USCIS Policy Manual Vol.12-E-2 (uscis.gov/policy-manual/volume-12-part-e-chapter-2),
+65/20 soru listesi (uscis.gov/sites/default/files/document/questions-and-answers/65-20q.pdf),
+CLINIC 2025 testi rehberi (cliniclegal.org). Erişim: 4 Tem 2026.
+
 ## Fiyatlandırma (davranışsal)
 
 | Karar | Temel |

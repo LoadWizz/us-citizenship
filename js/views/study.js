@@ -125,11 +125,16 @@ const StudyView = {
         (bilingual && nat) ? h("div", { class: "qtext qtext-native", lang: "tr", html: Lang.qHTMLNative(q, "tr") }) : null,
         h("div", { class: `qtext ${bilingual && nat ? "qtext-en-second" : ""}`, lang: "en", html: Lang.qHTMLEn(q) }),
         h("div", { class: "attention-line" },
-          "👀 Bu kelimelere dikkat: ",
+          "👀 ",
           h("span", { class: `cue cue-${q.cat}` }, cue),
-          " — bunu duyduğunda cevap aklına gelsin."),
+          " kelimelerini duyduğunda cevabın: ",
+          h("b", { class: "attn-answer", lang: "en" }, heroList.map(p => p.en).join(" + "))),
+        FREQ.noteOf(q.id) ? h("div", { class: "leverage-line" }, "💡 " + FREQ.noteOf(q.id)) : null,
         h("div", { class: "qcontrols" },
           Speech.ttsAvailable ? h("button", { class: "btn btn-circle", title: "Tekrar dinle", onclick: () => this.speakTeach(q, heroList) }, "🔊") : null)),
+
+      /* Öğreten diyagram (varsa): cevabı ayırt eden yapıyı göster */
+      MNEMO.of(q.id) ? h("div", { class: "card mnemo-card", html: MNEMO.of(q.id).svg }) : null,
 
       UI.answerCard(q, { natLang: "tr" }),
 
@@ -254,6 +259,9 @@ const StudyView = {
     ];
 
     area.appendChild(UI.answerCard(q, { natLang: App.nativeLang() }));
+    /* Cevap açıldıktan SONRA diyagram pekiştirir (önce gösterilmez — ipucu olmasın) */
+    const mn = MNEMO.of(q.id);
+    if (mn) area.appendChild(h("div", { class: "card mnemo-card", html: mn.svg }));
 
     if (this.lastSpeechMatch === true) {
       area.appendChild(h("div", { class: "speech-status ok" }, "🎤 Sesli cevabın eşleşmişti — 'İyi' veya 'Kolay' seç"));

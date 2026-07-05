@@ -125,7 +125,10 @@ const App = {
     const newPool = block ? block.ids : [];
 
     const dueCards = QUESTIONS.filter(q => unlockedIds.has(q.id) && SRS.isDue(map.get(q.id), now));
-    const newCards = QUESTIONS.filter(q => newPool.includes(q.id) && map.get(q.id).state === "new")
+    /* Yeni kartlar kaldıraç önceliğiyle tanıtılır (freq.js): tek ezberle çok
+     * soru açan ve resmî çekirdek sorular önce gelir. */
+    const newCandidates = QUESTIONS.filter(q => newPool.includes(q.id) && map.get(q.id).state === "new");
+    const newCards = (typeof FREQ !== "undefined" ? FREQ.orderNew(newCandidates) : newCandidates)
       .slice(0, this.settings.newPerDay);
 
     const queue = [...dueCards, ...newCards];

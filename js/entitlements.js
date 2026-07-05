@@ -109,7 +109,10 @@ const Entitlements = (() => {
     return state;
   }
 
-  /* E-posta ile geri yükleme */
+  /* E-posta ile geri yükleme.
+   * Backend Resend yapılandırılmışsa {sent:true} döner → kullanıcı e-postasına
+   * gelen 6 haneli kodu restoreVerify ile doğrular. Yapılandırılmamışsa
+   * (eski davranış) token doğrudan gelir ve hemen uygulanır. */
   async function restore(email) {
     const res = await fetch(backendUrl() + "/restore", {
       method: "POST",
@@ -121,7 +124,26 @@ const Entitlements = (() => {
       throw new Error(res.status === 404 ? "Bu e-postayla aktif abonelik bulunamadı" : "Geri yükleme başarısız: " + t.slice(0, 120));
     }
     const data = await res.json();
-    return applyToken(data);
+    if (data.token) {
+      await applyToken(data);
+      return { done: true };
+    }
+    return data; // {sent:true, mockCode?}
+  }
+
+  /* Geri yükleme kodunu doğrula → token uygula */
+  async function restoreVerify(email, code) {
+    const res = await fetch(backendUrl() + "/restore-verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, code })
+    });
+    if (!res.ok) {
+      let msg = "Kod doğrulanamadı";
+      try { msg = (await res.json()).error || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    return applyToken(await res.json());
   }
 
   /* ---------- Gelecek IAP sağlayıcıları (hibrit dikiş) ----------
@@ -151,6 +173,6 @@ const Entitlements = (() => {
   }
 
   return { load, current, has, plan, planHas, isActive, inGrace,
-           verifyWithBackend, applyToken, restore, clear,
+           verifyWithBackend, applyToken, restore, restoreVerify, clear,
            AppleIAPStub, GooglePlayStub, applyStoreEntitlement, devUnlock, GRACE_MS, backendUrl };
 })();

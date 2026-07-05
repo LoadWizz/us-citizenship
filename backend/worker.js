@@ -10,7 +10,10 @@
  *   POST /webhook                 (Stripe imza doğrulamalı)
  *   POST /session-status          {sessionId}  → ödeme senkron doğrulama
  *   POST /verify                  {token}      → entitlement tazele
- *   POST /restore                 {email}      → aboneliği e-postayla geri yükle
+ *   POST /restore                 {email}      → geri yükleme başlat
+ *        RESEND_API_KEY varsa (veya MOCK): 6 haneli kod e-postalanır → {sent:true}
+ *        yoksa (eski davranış): doğrudan token döner
+ *   POST /restore-verify          {email, code} → kodu doğrula → token
  *   POST /portal                  {email, returnUrl} → Stripe Customer Portal
  *
  * ENV (wrangler.toml / .env — ASLA repoya gerçek değer koyma):
@@ -18,6 +21,8 @@
  *   STRIPE_WEBHOOK_SECRET  whsec_...
  *   JWT_SECRET             uzun rastgele dize
  *   ALLOWED_ORIGINS        virgüllü liste veya *
+ *   RESEND_API_KEY         re_... — varsa restore e-posta doğrulamalı olur
+ *   MAIL_FROM              "US Citizenship <no-reply@alan.com>" (Resend'de doğrulanmış)
  *   MOCK_STRIPE            "true" → Stripe'sız yerel test (mock ödeme sayfası)
  *   PRICE_PREP_MONTHLY / PRICE_PREP_YEARLY / PRICE_PRO_MONTHLY /
  *   PRICE_PRO_YEARLY / PRICE_LIFETIME   → Stripe Price ID'leri
@@ -25,6 +30,7 @@
  * KV: env.ENTITLEMENTS  (Cloudflare KV; local adaptör Map sağlar)
  *   anahtar  email:<posta>  →  {plan,status,currentPeriodEnd,customerId,subscriptionId}
  *   anahtar  mock:<sid>     →  mock checkout oturumları (yalnız MOCK modda)
+ *   anahtar  otp:email:<posta> → {codeHash,expiresAt,attempts} (restore kodu)
  * ========================================================================= */
 "use strict";
 
@@ -115,6 +121,42 @@ async function verifyStripeSignature(payload, sigHeader, secret) {
   const sig = await crypto.subtle.sign("HMAC", key, te.encode(`${t}.${payload}`));
   const hex = [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, "0")).join("");
   return hex === v1;
+}
+
+/* SHA-256 hex — OTP kodu KV'de düz metin saklanmaz */
+async function sha256hex(s) {
+  const d = await crypto.subtle.digest("SHA-256", te.encode(s));
+  return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+const OTP_TTL_MS = 15 * 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+
+/* Resend ile geri yükleme doğrulama kodu gönder */
+async function sendRestoreEmail(env, email, code) {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "authorization": "Bearer " + env.RESEND_API_KEY,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      from: env.MAIL_FROM || "US Citizenship <onboarding@resend.dev>",
+      to: [email],
+      subject: `${code} — US Citizenship doğrulama kodun`,
+      html: `<div style="font-family:system-ui;max-width:420px;margin:0 auto">
+<h2 style="margin:16px 0 4px">🗽 US Citizenship</h2>
+<p>Satın alımını geri yüklemek için doğrulama kodun / Your verification code:</p>
+<p style="font-size:32px;font-weight:800;letter-spacing:6px;background:#f1f5f9;border-radius:12px;padding:14px;text-align:center">${code}</p>
+<p style="color:#64748b;font-size:13px">Kod 15 dakika geçerlidir. Bu isteği sen yapmadıysan bu e-postayı yok say.<br>
+The code expires in 15 minutes. If you didn't request this, ignore this email.</p>
+<p style="color:#94a3b8;font-size:12px">Ardaluna Holding LLC</p></div>`
+    })
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error("doğrulama e-postası gönderilemedi: " + t.slice(0, 120));
+  }
 }
 
 function priceIdFor(env, plan, interval) {
@@ -378,6 +420,42 @@ async function handle(req, env) {
     if (path === "/restore" && req.method === "POST") {
       const { email } = await req.json();
       if (!email || !email.includes("@")) return json({ error: "geçerli e-posta gerekli" }, 400, H);
+      const rec = await kvGet(env, entKey(email));
+      if (!rec || !isRecActive(rec)) return json({ error: "aktif abonelik bulunamadı" }, 404, H);
+
+      /* E-posta doğrulaması: token'ı e-postayı BİLEN değil, SAHİBİ alsın.
+       * Resend yapılandırılmamışsa eski (doğrudan token) davranış korunur. */
+      if (env.RESEND_API_KEY || mock) {
+        const code = String(Math.floor(100000 + Math.random() * 900000));
+        await kvPut(env, "otp:" + entKey(email), {
+          codeHash: await sha256hex(code),
+          expiresAt: Date.now() + OTP_TTL_MS,
+          attempts: 0
+        });
+        if (!env.RESEND_API_KEY) {
+          /* MOCK: e-posta çıkmaz, kod test için yanıtta döner */
+          return json({ sent: true, mockCode: code }, 200, H);
+        }
+        await sendRestoreEmail(env, email.trim(), code);
+        return json({ sent: true }, 200, H);
+      }
+      return json(await mintTokenPayload(env, email, rec), 200, H);
+    }
+
+    /* ------------------------------------------------ geri yükleme kodunu doğrula */
+    if (path === "/restore-verify" && req.method === "POST") {
+      const { email, code } = await req.json();
+      if (!email || !code) return json({ error: "e-posta ve kod gerekli" }, 400, H);
+      const otpKey = "otp:" + entKey(email);
+      const otp = await kvGet(env, otpKey);
+      if (!otp || otp.expiresAt < Date.now()) return json({ error: "kodun süresi dolmuş — yeniden kod iste" }, 400, H);
+      if (otp.attempts >= OTP_MAX_ATTEMPTS) return json({ error: "çok fazla yanlış deneme — yeniden kod iste" }, 429, H);
+      if (await sha256hex(String(code).trim()) !== otp.codeHash) {
+        otp.attempts++;
+        await kvPut(env, otpKey, otp);
+        return json({ error: "kod yanlış" }, 401, H);
+      }
+      await kvPut(env, otpKey, { ...otp, expiresAt: 0 }); // tek kullanımlık
       const rec = await kvGet(env, entKey(email));
       if (!rec || !isRecActive(rec)) return json({ error: "aktif abonelik bulunamadı" }, 404, H);
       return json(await mintTokenPayload(env, email, rec), 200, H);

@@ -123,7 +123,14 @@ const PaywallView = {
     if (!email) return;
     try {
       UI.toast("Abonelik aranıyor...");
-      await Entitlements.restore(email.trim());
+      const r = await Entitlements.restore(email.trim());
+      if (r && r.sent) {
+        /* E-posta doğrulaması: 6 haneli kod (MOCK modda kod otomatik dolu gelir) */
+        const code = prompt("E-postana 6 haneli doğrulama kodu gönderdik. Kodu gir:", r.mockCode || "");
+        if (!code) return;
+        UI.toast("Kod doğrulanıyor...");
+        await Entitlements.restoreVerify(email.trim(), code.trim());
+      }
       UI.toast("🎉 Aboneliğin geri yüklendi!");
       UI.navigate("/home");
     } catch (e) {

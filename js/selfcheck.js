@@ -70,6 +70,22 @@ const SelfCheck = (() => {
     }
     ok("TR paketi tam (soru+ipucu+paralel cevaplar)", trFail.length === 0, trFail.slice(0, 8).join(","));
 
+    /* ---------- 3a-ES) İspanyolca dil paketi (yüklüyse — TR ile aynı kurallar) ---------- */
+    if (typeof LANG_ES !== "undefined") {
+      let esFail = [];
+      for (const q of QUESTIONS) {
+        const t = LANG_ES[q.id];
+        if (!t || !t.q || !t.q.trim()) { esFail.push(q.id + ":q"); continue; }
+        if (!t.cue || !t.q.includes(t.cue)) esFail.push(q.id + ":cue");
+        if (t.a === null) {
+          if (!TR_NULL_OK.includes(q.id)) esFail.push(q.id + ":null?");
+        } else if (!Array.isArray(t.a) || t.a.length !== q.a.length || t.a.some(x => !x || !x.trim())) {
+          esFail.push(q.id + ":a");
+        }
+      }
+      ok("ES paketi tam (soru+ipucu+paralel cevaplar)", esFail.length === 0, esFail.slice(0, 8).join(","));
+    }
+
     /* ---------- 3b) "En kolay cevap" küratörlüğü ---------- */
     let bestFail = [];
     for (const q of QUESTIONS) {
@@ -82,6 +98,41 @@ const SelfCheck = (() => {
       if (b && new Set(b).size !== b.length) bestFail.push(q.id + ":tekrar");
     }
     ok("En kolay cevap seti tam ve geçerli (çok cevaplı 128 alt kümesi)", bestFail.length === 0, bestFail.slice(0, 8).join(","));
+
+    /* ---------- 3c) Kaldıraç katmanı (freq.js) ---------- */
+    if (typeof FREQ !== "undefined") {
+      let fqFail = [];
+      const idSet = new Set(ids);
+      for (const c of FREQ.CLUSTERS) {
+        if (new Set(c.ids).size !== c.ids.length) fqFail.push(c.key + ":tekrar");
+        for (const id of c.ids) {
+          if (!idSet.has(id)) { fqFail.push(c.key + ":" + id + ":yok"); continue; }
+          if (c.type === "answer") {
+            const q = QUESTIONS[id - 1];
+            const coreN = norm(c.core);
+            if (!q.a.some(ans => norm(ans).includes(coreN))) fqFail.push(c.key + ":" + id + ":cevap-dışı");
+          }
+          if (!FREQ.noteOf(id)) fqFail.push(c.key + ":" + id + ":not-yok");
+        }
+      }
+      /* Tanıtım sırası: en yüksek öncelik yıldızlı+dinamik (38: başkan) önde olmalı */
+      const order = FREQ.orderNew(QUESTIONS);
+      const rankHead = FREQ.rankOf(order[0]);
+      const rankOkay = order.every((q, i) => i === 0 || FREQ.rankOf(order[i - 1]) >= FREQ.rankOf(q));
+      if (!rankOkay || rankHead < FREQ.rankOf(QUESTIONS[37])) fqFail.push("sıralama");
+      ok("Kaldıraç kümeleri geçerli (cevap-çekirdeği + not + sıra)", fqFail.length === 0, fqFail.slice(0, 8).join(","));
+    }
+
+    /* ---------- 3d) Öğreten diyagramlar (mnemo.js) ---------- */
+    if (typeof MNEMO !== "undefined") {
+      let mnFail = [];
+      const idSet2 = new Set(ids);
+      for (const [id, m] of Object.entries(MNEMO.MAP)) {
+        if (!idSet2.has(Number(id))) mnFail.push(id + ":yok");
+        if (!m.svg || !m.svg.includes("<svg") || !m.svg.includes("aria-label")) mnFail.push(id + ":svg");
+      }
+      ok("Diyagramlar geçerli (id + svg + erişilebilir etiket)", mnFail.length === 0, mnFail.slice(0, 8).join(","));
+    }
 
     /* ---------- 4) Kategori aralıkları ---------- */
     const catCheck =

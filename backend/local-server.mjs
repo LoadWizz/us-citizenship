@@ -42,7 +42,7 @@ const env = {
   MOCK_BASE_URL: `http://localhost:${PORT}`,
   ...fileEnv,
   ...Object.fromEntries(Object.entries(process.env).filter(([k]) =>
-    /^(STRIPE_|JWT_|PRICE_|ALLOWED_|MOCK_)/.test(k))),
+    /^(STRIPE_|JWT_|PRICE_|ALLOWED_|MOCK_|RESEND_|MAIL_)/.test(k))),
   ENTITLEMENTS
 };
 
