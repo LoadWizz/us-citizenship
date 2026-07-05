@@ -187,10 +187,10 @@ const BlockTestView = {
     const parts = [];
     if (!this.s.enOnly) {
       const n = Lang.native(q, "tr");
-      if (n) parts.push({ text: n.q, lang: "tr" });
+      if (n) parts.push({ text: n.q, lang: "tr", rate: App.rateFor("tr") });
     }
-    parts.push({ text: q.q, lang: "en" });
-    Speech.speakSequence(parts, { rate: App.settings.ttsRate });
+    parts.push({ text: q.q, lang: "en", rate: App.rateFor("en") });
+    Speech.speakSequence(parts);
   },
 
   listen(q, answers) {

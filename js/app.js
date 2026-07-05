@@ -13,7 +13,8 @@ const App = {
     langMode: null,        // null = onboarding yapılmadı | "bilingual" | "en"
     newPerDay: 12,
     autoTTS: true,
-    ttsRate: 0.92,
+    ttsRate: 0.72,     // İNGİLİZCE okuma hızı — memur temposu, öğrenen dostu (6 Tem)
+    ttsRateTr: 0.95,   // Türkçe anadil hızı — yavaşlatma gereksiz
     realisticExam: true,   // 12 doğru / 9 yanlışta erken bitir
     theme: "auto",         // auto | light | dark
     apiKey: "",
@@ -29,7 +30,19 @@ const App = {
     const saved = await DB.getKV("settings");
     this.settings = { ...this.DEFAULT_SETTINGS, ...(saved || {}) };
     this.settings.officials = { ...DEFAULT_OFFICIALS, ...((saved && saved.officials) || {}) };
+    /* Tek seferlik geçiş (6 Tem): eski kurulumlarda EN hızı 0.92 kayıtlıydı —
+     * yeni yavaş varsayılana indir; kullanıcı sürgüden bilinçli değiştirirse dokunma */
+    if (saved && !saved.rateV2) {
+      this.settings.ttsRate = Math.min(this.settings.ttsRate, 0.72);
+      this.settings.rateV2 = true;
+      await DB.setKV("settings", this.settings);
+    }
     return this.settings;
+  },
+
+  /* Dile göre okuma hızı — TÜM sesli okuma çağrıları bunu kullanmalı */
+  rateFor(lang) {
+    return lang === "tr" ? this.settings.ttsRateTr : this.settings.ttsRate;
   },
 
   async saveSettings() {

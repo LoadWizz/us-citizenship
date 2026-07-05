@@ -78,14 +78,14 @@ const EnglishView = {
           h("span", { style: { width: "52px" } })),
         h("div", { class: "card center" },
           h("p", { class: "muted" }, "Memur cümleyi okuyor — dinle ve yaz:"),
-          h("button", { class: "btn btn-circle btn-bigcircle", onclick: () => Speech.speak(s.en, { rate: 0.85 }) }, "🔊"),
+          h("button", { class: "btn btn-circle btn-bigcircle", onclick: () => Speech.speak(s.en, { rate: App.rateFor("en") }) }, "🔊"),
           h("p", { class: "small muted" }, "İstediğin kadar tekrar dinleyebilirsin")),
         input,
         h("button", { class: "btn btn-primary btn-big", onclick: check }, "Kontrol Et"),
         feedback
       ));
 
-      if (Speech.ttsAvailable) setTimeout(() => Speech.speak(s.en, { rate: 0.85 }), 400);
+      if (Speech.ttsAvailable) setTimeout(() => Speech.speak(s.en, { rate: App.rateFor("en") }), 400);
     };
     renderOne();
   },
@@ -125,7 +125,7 @@ const EnglishView = {
           h("div", { class: "read-sentence", lang: "en" }, s.en),
           h("div", { class: "small muted" }, "🇹🇷 " + s.tr),
           h("div", { class: "qcontrols" },
-            Speech.ttsAvailable ? h("button", { class: "btn btn-circle", title: "Doğru telaffuzu dinle", onclick: () => Speech.speak(s.en, { rate: 0.85 }) }, "🔊") : null,
+            Speech.ttsAvailable ? h("button", { class: "btn btn-circle", title: "Doğru telaffuzu dinle", onclick: () => Speech.speak(s.en, { rate: App.rateFor("en") }) }, "🔊") : null,
             Speech.sttAvailable ? h("button", {
               class: "btn btn-circle", id: "mic-btn", title: "Okuyuşunu kontrol et",
               onclick: () => {

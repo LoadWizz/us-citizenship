@@ -93,12 +93,13 @@ const SettingsView = {
         numField("newPerDay", "Günlük yeni soru sayısı", 3, 40),
         toggleField("autoTTS", "Soruları otomatik sesli oku", "Memur simülasyonu — kart açılınca soru okunur"),
         h("label", { class: "field" },
-          h("span", { class: "field-label" }, `Konuşma hızı: ${s.ttsRate.toFixed(2)}`),
+          h("span", { class: "field-label" }, `İngilizce konuşma hızı: ${s.ttsRate.toFixed(2)}`),
           h("input", {
-            type: "range", min: 0.6, max: 1.2, step: 0.02, value: s.ttsRate,
-            oninput: (e) => { s.ttsRate = +e.target.value; e.target.previousSibling.textContent = `Konuşma hızı: ${s.ttsRate.toFixed(2)}`; },
+            type: "range", min: 0.5, max: 1.1, step: 0.02, value: s.ttsRate,
+            oninput: (e) => { s.ttsRate = +e.target.value; e.target.previousSibling.textContent = `İngilizce konuşma hızı: ${s.ttsRate.toFixed(2)}`; },
             onchange: async () => { await App.saveSettings(); Speech.speak("What is the supreme law of the land?", { rate: s.ttsRate }); }
-          })),
+          }),
+          h("div", { class: "small muted" }, "Varsayılan 0.72 — memur temposu. Türkçe okuma her zaman normal hızdadır.")),
         toggleField("realisticExam", "Gerçekçi sınav modu", "12 doğruda veya 9 yanlışta sınavı erken bitir (gerçek mülakat gibi)"),
         h("label", { class: "field" },
           h("span", { class: "field-label" }, "Tema"),

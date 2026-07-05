@@ -72,12 +72,13 @@ const Speech = (() => {
   }
 
   /* Sıralı okuma. KURAL: her parçanın text'i KENDİ dilinde olmalı —
-   * TR sesiyle İngilizce metin okutmak yasak (çağıran taraf filtreler). */
+   * TR sesiyle İngilizce metin okutmak yasak (çağıran taraf filtreler).
+   * Parça kendi rate'ini taşıyabilir (TR normal, EN yavaş). */
   function speakSequence(parts, opts = {}) {
     const list = parts.filter(p => p && p.text);
     const next = (i) => {
       if (i >= list.length) return;
-      speak(list[i].text, { lang: list[i].lang, rate: opts.rate, onend: () => next(i + 1) });
+      speak(list[i].text, { lang: list[i].lang, rate: list[i].rate || opts.rate, onend: () => next(i + 1) });
     };
     next(0);
   }

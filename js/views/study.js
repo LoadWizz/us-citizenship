@@ -135,7 +135,7 @@ const StudyView = {
         }, "Soruyu İngilizce Sor →"));
       steps.appendChild(box);
       /* kart açılır açılmaz Türkçe okunur; şerit metni kelime kelime izler */
-      Karaoke.play(kTR, { lang: "tr", rate: App.settings.ttsRate });
+      Karaoke.play(kTR, { lang: "tr", rate: App.rateFor("tr") });
       UI.tapGuard(box);
     };
 
@@ -207,7 +207,7 @@ const StudyView = {
         UI.h("div", { class: "step-btns" },
           Speech.ttsAvailable ? UI.h("button", { class: "btn btn-outline", onclick: () => playAnswers(0) }, "Cevabı Dinle") : null,
           (Speech.ttsAvailable && Speech.hasVoice("tr") && natTexts.length)
-            ? UI.h("button", { class: "btn btn-outline", onclick: () => Speech.speak(natTexts.join(". "), { lang: "tr", rate: App.settings.ttsRate }) }, "Türkçesini Dinle")
+            ? UI.h("button", { class: "btn btn-outline", onclick: () => Speech.speak(natTexts.join(". "), { lang: "tr", rate: App.rateFor("tr") }) }, "Türkçesini Dinle")
             : null));
 
       steps.appendChild(box);
