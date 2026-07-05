@@ -382,9 +382,9 @@ const StudyView = {
 
     if (Speech.ttsAvailable) {
       area.appendChild(h("button", {
-        class: "btn btn-ghost",
-        onclick: () => Speech.speak(Lang.speakableAnswers(q, App.settings.officials).map(Speech.speakable).join(". "), { lang: "en", rate: App.settings.ttsRate })
-      }, "🔊 Cevabı dinle"));
+        class: "btn btn-outline btn-big",
+        onclick: () => Speech.speak(Lang.speakableAnswers(q, App.settings.officials).map(Speech.speakable).join(". "), { lang: "en", rate: App.rateFor("en") })
+      }, "Cevabı Sesli Dinle"));
     }
 
     if (opts.correct) {

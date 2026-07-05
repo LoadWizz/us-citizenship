@@ -42,19 +42,21 @@ const SelfCheck = (() => {
     ok("Türkçe açıklama + kanca tam",
        QUESTIONS.every(q => q.tr && q.hook));
 
-    /* ---------- 2) İpucu (cue) bütünlüğü ---------- */
-    let cueMissing = [], cueNotSub = [], cueNotUniq = [];
+    /* ---------- 2) İpucu (cue) bütünlüğü ----------
+     * NOT (6 Tem, ürün kararı): benzersizlik şartı KALDIRILDI — ipucu artık
+     * kısa KONU ÇAPASIDIR ve aynı çapa birden çok soruda renklenebilir
+     * ("Declaration of Independence" 8/78). Kalan kurallar: var + birebir
+     * alt dize + makul uzunluk (çapa cümle olmasın). */
+    let cueMissing = [], cueNotSub = [], cueTooLong = [];
     for (const q of QUESTIONS) {
       const cue = CUES[q.id];
       if (!cue) { cueMissing.push(q.id); continue; }
       if (!q.q.includes(cue)) cueNotSub.push(q.id);
-      const nCue = norm(cue);
-      const hits = QUESTIONS.filter(x => (" " + norm(x.q) + " ").includes(" " + nCue + " "));
-      if (hits.length !== 1 || hits[0].id !== q.id) cueNotUniq.push(q.id);
+      if (cue.split(" ").length > 6) cueTooLong.push(q.id);
     }
     ok("Her soruda ipucu (cue) var", cueMissing.length === 0, cueMissing.join(","));
     ok("İpucu soru metninin birebir parçası", cueNotSub.length === 0, cueNotSub.join(","));
-    ok("İpucu 128 bankada BENZERSİZ (cue overload yok)", cueNotUniq.length === 0, cueNotUniq.join(","));
+    ok("İpucu kısa konu çapası (≤6 kelime)", cueTooLong.length === 0, cueTooLong.join(","));
 
     /* ---------- 3) Türkçe dil paketi ---------- */
     let trFail = [];

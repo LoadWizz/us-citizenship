@@ -1,44 +1,43 @@
 /* =========================================================================
- * cues.js — Benzersiz ipucu öbekleri (cue phrases), 128 soru için elle küre edildi.
+ * cues.js — Renkli ipucu öbekleri (cue phrases), 128 soru için elle küre edildi.
  *
- * BİLİMSEL TEMEL:
- *  - Cue overload ilkesi (Watkins & Watkins 1975): bir geri getirme ipucu
- *    ne kadar çok hedefe bağlıysa tek hedefi çağırma gücü o kadar düşer.
- *    Bu yüzden "president"(8 soru), "constitution"(8), "how many"(7),
- *    "supreme"(5) gibi öbekler ASLA ipucu olamaz.
- *  - Von Restorff izolasyon etkisi: dizide görsel olarak ayrışan öğe daha
- *    iyi hatırlanır → ipucu soru metninde renkli vurgulanır (yalnız ipucu).
- *  - Dual coding (Paivio): işitsel soru + görsel renkli ipucu çifti.
+ * İLKE (6 Tem 2026 — ürün kararı, Erkan):
+ *  İpucu = sorunun KONU ÇAPASI: özel isim, tarih, sayı veya çekirdek
+ *  kavram. Fiiller ve soru kalıpları renklenmez ("wrote the Declaration
+ *  of Independence" değil "Declaration of Independence"; "happened on
+ *  September 11" değil "on September 11"). Kullanıcı renkli çapayı
+ *  duyduğunda konuyu tanır; hangi soru olduğunu çevredeki (renksiz)
+ *  kelimeler belirler.
  *
- * KURALLAR (selfcheck.js programatik doğrular):
- *  1. Her ipucu, ait olduğu sorunun BİREBİR alt dizisidir (kıvrık kesme
- *     işaretleri dahil) — vurgulama yerinde yapılır.
- *  2. Normalize edilmiş ipucu, 128 soru bankasında YALNIZCA kendi
- *     sorusunda geçer (n-gram benzersizliği).
- *  3. İpucu anlam taşır: sorunun cevabı ayırt eden çekirdeğidir
- *     (örn. S2'de "supreme" değil "law of the land"; S55'te uzun kalıp
- *     yerine S56'nın "Why"ından ayrışan "How long do").
+ *  NOT: Eski sürümdeki "128 bankada benzersizlik" şartı bu kararla
+ *  gevşetildi — aynı çapa birden çok soruda renklenebilir (örn.
+ *  "Declaration of Independence" 8/78'de, "three branches" 15/16'da).
+ *  Von Restorff vurgusu ve çift kodlama korunur; ayırt etme işi kısa
+ *  çapayla değil cümlenin geri kalanıyla yapılır.
+ *
+ * KURAL (selfcheck.js doğrular): her ipucu, ait olduğu sorunun BİREBİR
+ * alt dizisidir (kıvrık kesme işaretleri dahil) — vurgulama yerinde yapılır.
  * ========================================================================= */
 "use strict";
 
 const CUES = {
   1:   "form of government",
-  2:   "law of the land",
+  2:   "supreme law",
   3:   "Constitution does",
   4:   "We the People",
   5:   "changes made",
   6:   "Bill of Rights",
   7:   "How many amendments",
-  8:   "Declaration of Independence important",
+  8:   "Declaration of Independence",
   9:   "free from Britain",
   10:  "two important ideas",
   11:  "pursuit of Happiness",
   12:  "economic system",
   13:  "rule of law",
   14:  "documents influenced",
-  15:  "branches of government. Why",
-  16:  "Name the three branches",
-  17:  "in charge of which branch",
+  15:  "three branches",
+  16:  "three branches",
+  17:  "which branch",
   18:  "writes laws",
   19:  "two parts",
   20:  "power of the U.S. Congress",
@@ -46,9 +45,9 @@ const CUES = {
   22:  "term for a U.S. senator",
   23:  "your state’s U.S. senators",
   24:  "voting members",
-  25:  "term for a member of the House",
+  25:  "member of the House",
   26:  "shorter terms",
-  27:  "senators does each state",
+  27:  "How many senators",
   28:  "two senators",
   29:  "your U.S. representative",
   30:  "Speaker of the House",
@@ -57,7 +56,7 @@ const CUES = {
   33:  "House of Representatives represent",
   34:  "elects members",
   35:  "more representatives",
-  36:  "elected for how many years",
+  36:  "how many years",
   37:  "only two terms",
   38:  "name of the President",
   39:  "Vice President",
@@ -66,18 +65,18 @@ const CUES = {
   42:  "Commander in Chief",
   43:  "signs bills",
   44:  "vetoes",
-  45:  "appoints federal judges",
+  45:  "federal judges",
   46:  "executive branch",
   47:  "President’s Cabinet",
   48:  "Cabinet-level positions",
   49:  "Electoral College",
-  50:  "part of the judicial branch",
+  50:  "judicial branch",
   51:  "judicial branch do",
   52:  "highest court",
-  53:  "seats",
+  53:  "How many seats",
   54:  "decide a case",
-  55:  "How long do",
-  56:  "serve for life. Why",
+  55:  "How long",
+  56:  "for life",
   57:  "Chief Justice",
   58:  "only for the federal",
   59:  "only for the states",
@@ -92,39 +91,39 @@ const CUES = {
   68:  "become United States citizens",
   69:  "civic participation",
   70:  "serve their country",
-  71:  "pay federal taxes",
+  71:  "federal taxes",
   72:  "Selective Service",
   73:  "colonists came",
   74:  "before the Europeans",
   75:  "sold as slaves",
   76:  "win independence from Britain",
   77:  "declared independence",
-  78:  "wrote the Declaration of Independence",
+  78:  "Declaration of Independence",
   79:  "adopted",
   80:  "American Revolution",
   81:  "13 original states",
   82:  "written in 1787",
   83:  "one of the writers",
-  84:  "Federalist Papers important",
+  84:  "Federalist Papers",
   85:  "Benjamin Franklin",
   86:  "George Washington",
   87:  "Thomas Jefferson",
   88:  "James Madison",
   89:  "Alexander Hamilton",
-  90:  "buy from France in 1803",
-  91:  "United States in the 1800s",
+  90:  "France in 1803",
+  91:  "in the 1800s",
   92:  "North and the South",
   93:  "Civil War",
   94:  "Abraham Lincoln",
   95:  "Emancipation Proclamation",
-  96:  "war ended slavery",
+  96:  "ended slavery",
   97:  "born or naturalized",
-  98:  "men get the right to vote",
+  98:  "all men",
   99:  "women’s rights movement",
   100: "1900s",
   101: "World War I",
   102: "all women",
-  103: "What was the Great Depression",
+  103: "Great Depression",
   104: "Great Depression start",
   105: "Great Depression and World War II",
   106: "enter World War II",
@@ -136,7 +135,7 @@ const CUES = {
   112: "civil rights movement",
   113: "Martin Luther King",
   114: "Persian Gulf War",
-  115: "happened on September 11",
+  115: "on September 11",
   116: "military conflict after",
   117: "American Indian tribe",
   118: "American innovation",

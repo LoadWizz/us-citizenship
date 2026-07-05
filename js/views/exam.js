@@ -16,12 +16,12 @@ const ExamView = {
     root.appendChild(h("div", { class: "page" },
       h("h1", {}, "🎓 Deneme Sınavı"),
       h("div", { class: "card" },
-        h("p", {}, h("b", {}, "2025 kuralları:"), " Memur 128 soruluk havuzdan 20 soru sorar. ",
-          h("b", {}, "12 doğru = GEÇTİN."), " Test sözlüdür."),
+        h("p", {}, h("b", {}, "2025 kuralları:"), " Görevli memur sınavda 128 soruluk havuzdan sözlü olarak 20 soru sorar."),
         h("ul", { class: "rules" },
-          h("li", {}, "Sorular sesli okunur (memur simülasyonu)."),
-          h("li", {}, "Cevabı YÜKSEK SESLE söyle, sonra kontrol et."),
-          h("li", {}, Speech.sttAvailable ? "🎤 ile sesli cevap verirsen otomatik eşleştirilir." : "Bu tarayıcıda ses tanıma yok — kendin işaretleyeceksin."),
+          h("li", {}, h("b", {}, "12 doğru"), " cevap verirsen = sınavı başarıyla tamamladın."),
+          h("li", {}, h("b", {}, "9 yanlış"), " cevap verirsen = sınavda başarısız oldun."),
+          h("li", {}, "Memur soruları sana konuşarak, sözlü olarak sorar — burada da öyle."),
+          h("li", {}, Speech.sttAvailable ? "Cevabı YÜKSEK SESLE söyle; uygulama dinler ve değerlendirir." : "Bu tarayıcıda ses tanıma yok — cevabı kendin işaretleyeceksin."),
           h("li", {}, App.settings.realisticExam
             ? "Gerçekçi mod AÇIK: 12 doğruda veya 9 yanlışta sınav erken biter."
             : "Gerçekçi mod KAPALI: 20 sorunun tamamı sorulur."))),
@@ -56,20 +56,24 @@ const ExamView = {
     return s.correct >= 12 || s.wrong >= 9;
   },
 
-  /* Üst gezinti: cevaplanan sorular arasında ileri/geri (cevaplar açık kalır) */
+  /* Üst gezinti: cevaplanan sorular arasında ileri/geri (cevaplar açık kalır).
+   * SÜRE tek yerde ve yalnız CANLI soruda gösterilir — cevaplanmış soruya
+   * dönüldüğünde süre kutusu hiç yoktur (iki değerin çakışıp "yanıp
+   * sönmesi" bitti, 6 Tem). */
   navBar() {
     const { h } = UI;
     const s = this.state;
-    const at = s.viewIdx === null ? s.idx : s.viewIdx;
+    const live = s.viewIdx === null;
+    const at = live ? s.idx : s.viewIdx;
     const canBack = at > 0;
-    const canFwd = s.viewIdx !== null; // yalnız geçmişteyken ileri gidilebilir
+    const canFwd = !live;
     return h("div", { class: "study-top" },
       h("button", { class: "btn btn-ghost small-btn", onclick: () => { if (confirm("Sınavı iptal et?")) { clearInterval(s.timerId); UI.navigate("/home"); } } }, "✕"),
       h("div", { class: "exam-nav" },
         h("button", { class: "btn btn-ghost small-btn", disabled: !canBack, onclick: () => this.goto(at - 1) }, "‹"),
         h("span", { class: "muted" }, `Soru ${at + 1} / ${s.questions.length}`),
         h("button", { class: "btn btn-ghost small-btn", disabled: !canFwd, onclick: () => this.goto(at + 1) }, "›")),
-      h("span", { class: "timer", id: "exam-timer" }, "0:00"));
+      live ? h("span", { class: "timer", id: "exam-timer" }, "0:00") : h("span", { style: { width: "52px" } }));
   },
 
   goto(i) {
@@ -102,6 +106,10 @@ const ExamView = {
         it.correct ? "✅ Doğru cevapladın" : "✗ Bilemedin"),
       it.heard ? h("p", { class: "small muted center" }, `Senin cevabın: “${it.heard}”`) : null,
       UI.answerCard(q, { natLang: null }),
+      Speech.ttsAvailable ? h("button", {
+        class: "btn btn-outline btn-big",
+        onclick: () => Speech.speak(Lang.speakableAnswers(q, App.settings.officials).map(Speech.speakable).join(". "), { lang: "en", rate: App.rateFor("en") })
+      }, "Cevabı Sesli Dinle") : null,
       h("button", { class: "btn btn-primary btn-big", onclick: () => this.goto(s.items.length) }, "Kaldığın soruya dön →")
     ));
   },
@@ -122,16 +130,15 @@ const ExamView = {
 
     const q = s.questions[s.idx];
     const answers = effectiveAnswers(q, App.settings.officials);
-    s.qStart = Date.now();
+    /* geçmişe bakıp dönünce süre SIFIRLANMAZ — soru başına tek başlangıç */
+    if (s.qStartIdx !== s.idx) { s.qStart = Date.now(); s.qStartIdx = s.idx; }
     this.kara = Karaoke.line(q.q, { cue: CUES[q.id], cat: q.cat });
 
+    /* Tek, sabit görünümlü GEÇEN süre — renk değiştirmez, yanıp sönmez */
     s.timerId = setInterval(() => {
       const sec = Math.floor((Date.now() - s.qStart) / 1000);
       const el = document.getElementById("exam-timer");
-      if (el) {
-        el.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
-        el.classList.toggle("timer-slow", sec > 30);
-      }
+      if (el) el.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     }, 1000);
 
     const status = h("div", { class: "speech-status", id: "speech-status" });
@@ -238,6 +245,14 @@ const ExamView = {
     Speech.stopListening();
 
     area.appendChild(UI.answerCard(q, { natLang: null })); // sınav salt İngilizce
+
+    /* test aynı zamanda çalışmadır: cevabı sesli dinleme her zaman elinin altında */
+    if (Speech.ttsAvailable) {
+      area.appendChild(h("button", {
+        class: "btn btn-outline btn-big",
+        onclick: () => Speech.speak(Lang.speakableAnswers(q, App.settings.officials).map(Speech.speakable).join(". "), { lang: "en", rate: App.rateFor("en") })
+      }, "Cevabı Sesli Dinle"));
+    }
 
     area.appendChild(h("div", { class: "exam-btns" },
       h("button", { class: "btn grade-btn grade-good btn-big", onclick: () => this.mark(q, true) }, "✓ Doğru bildim"),
