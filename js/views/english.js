@@ -78,7 +78,7 @@ const EnglishView = {
           h("span", { style: { width: "52px" } })),
         h("div", { class: "card center" },
           h("p", { class: "muted" }, "Memur cümleyi okuyor — dinle ve yaz:"),
-          h("button", { class: "btn btn-circle btn-bigcircle", onclick: () => Speech.speak(s.en, { rate: App.rateFor("en") }) }, "🔊"),
+          h("button", { class: "btn btn-outline btn-big", onclick: () => Speech.speak(s.en, { rate: App.rateFor("en") }) }, "Cümleyi Dinle"),
           h("p", { class: "small muted" }, "İstediğin kadar tekrar dinleyebilirsin")),
         input,
         h("button", { class: "btn btn-primary btn-big", onclick: check }, "Kontrol Et"),
@@ -124,10 +124,10 @@ const EnglishView = {
           h("p", { class: "muted small" }, "Bu cümleyi YÜKSEK SESLE oku:"),
           h("div", { class: "read-sentence", lang: "en" }, s.en),
           h("div", { class: "small muted" }, "🇹🇷 " + s.tr),
-          h("div", { class: "qcontrols" },
-            Speech.ttsAvailable ? h("button", { class: "btn btn-circle", title: "Doğru telaffuzu dinle", onclick: () => Speech.speak(s.en, { rate: App.rateFor("en") }) }, "🔊") : null,
+          h("div", { class: "step-btns" },
+            Speech.ttsAvailable ? h("button", { class: "btn btn-outline", onclick: () => Speech.speak(s.en, { rate: App.rateFor("en") }) }, "Doğru Telaffuzu Dinle") : null,
             Speech.sttAvailable ? h("button", {
-              class: "btn btn-circle", id: "mic-btn", title: "Okuyuşunu kontrol et",
+              class: "btn btn-primary", id: "mic-btn",
               onclick: () => {
                 status.textContent = "🎙️ Dinliyorum — cümleyi oku";
                 document.getElementById("mic-btn").classList.add("listening");
@@ -135,13 +135,13 @@ const EnglishView = {
                   onResult: (alts) => {
                     const res = Speech.compareDictation(s.en, alts[0]);
                     if (res.ratio >= 0.7) { status.innerHTML = "✅ Güzel okudun!"; status.className = "speech-status ok"; }
-                    else { status.innerHTML = `Duyulan: “${UI.esc(alts[0])}” — tekrar dene veya 🔊 ile dinle`; status.className = "speech-status"; }
+                    else { status.innerHTML = `Duyulan: “${UI.esc(alts[0])}” — tekrar dene veya doğru telaffuzu dinle`; status.className = "speech-status"; }
                   },
                   onError: () => { status.textContent = "Ses tanıma çalışmadı — kendin değerlendir"; },
                   onEnd: () => { const m = document.getElementById("mic-btn"); if (m) m.classList.remove("listening"); }
                 });
               }
-            }, "🎤") : null),
+            }, "Okuyuşumu Kontrol Et") : null),
           status),
         h("div", { class: "exam-btns" },
           h("button", { class: "btn grade-btn grade-good btn-big", onclick: () => next(true) }, "✓ Rahat okudum"),

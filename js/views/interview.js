@@ -29,9 +29,10 @@ const InterviewView = {
           h("p", {}, step.tr),
           h("ul", { class: "tips" }, step.tips.map(t => h("li", {}, t))),
           Speech.ttsAvailable ? h("button", {
-            class: "btn btn-ghost small-btn",
-            onclick: () => Speech.speak(step.en.replace(/["""]/g, ""), { rate: App.settings.ttsRate })
-          }, "🔊 İngilizcesini dinle") : null
+            class: "btn btn-outline small-btn",
+            style: { width: "auto" },
+            onclick: () => Speech.speak(step.en.replace(/["""]/g, ""), { rate: App.rateFor("en") })
+          }, "İngilizcesini Dinle") : null
         ],
         { critical: step.critical, open: step.step === 1 })),
 
@@ -41,7 +42,7 @@ const InterviewView = {
         SMALL_TALK.map(s => h("div", { class: "smalltalk-item" },
           h("div", { class: "row-between" },
             h("b", { lang: "en" }, s.en),
-            Speech.ttsAvailable ? h("button", { class: "btn btn-circle btn-mini", onclick: () => Speech.speak(s.en, { rate: App.settings.ttsRate }) }, "🔊") : null),
+            Speech.ttsAvailable ? h("button", { class: "btn btn-outline small-btn", style: { width: "auto" }, onclick: () => Speech.speak(s.en, { rate: App.rateFor("en") }) }, "Dinle") : null),
           h("div", { class: "small muted" }, s.tr),
           h("div", { class: "small ok", lang: "en" }, "→ " + s.sample)))),
 

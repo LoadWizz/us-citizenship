@@ -173,8 +173,8 @@ const BlockTestView = {
       h("div", { class: "card qcard" },
         natHTML ? h("div", { class: "qtext qtext-native", lang: "tr", html: natHTML }) : null,
         h("div", { class: `qtext ${natHTML ? "qtext-en-second" : ""}`, lang: "en", html: Lang.qHTMLEn(q) }),
-        h("div", { class: "qcontrols" },
-          Speech.ttsAvailable ? h("button", { class: "btn btn-circle", onclick: () => this.speakQ(q) }, "🔊") : null),
+        h("div", { class: "step-btns" },
+          Speech.ttsAvailable ? h("button", { class: "btn btn-outline", onclick: () => this.speakQ(q) }, "Soruyu Sesli Dinle") : null),
         status),
       answerArea
     ));
