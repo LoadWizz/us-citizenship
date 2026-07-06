@@ -68,11 +68,11 @@ const Karaoke = (() => {
     k.timers.forEach(clearTimeout);
     k.timers = [];
     k.playing = false;
+    k.el.classList.remove("kara-reading");
     k.spans.forEach(s => s.classList.remove("kara-now", "kara-up", "kara-done"));
   }
 
   function markUpTo(k, spokenIdx) {
-    k.spans.forEach((s, i) => s.classList.remove("kara-now"));
     for (let si = 0; si < k.spoken.length; si++) {
       const span = k.spans[k.spoken[si].idx];
       span.classList.remove("kara-up", "kara-done", "kara-now");
@@ -89,24 +89,23 @@ const Karaoke = (() => {
     if (onend) onend();
   }
 
+  /* Şerit YALNIZ gerçek kelime-sınırı olayına (audio ile birebir) bağlıdır.
+   * NEDEN (5 Tem ölçümü, gerçek Chrome): 'onstart' sesten ~1.1 sn ÖNCE
+   * ateşliyor ve mobil TTS'te kelime-sınırı hiç gelmeyebiliyor — bu yüzden
+   * ESKİ tahmini zamanlama sesin önünden koşup desync yaratıyordu.
+   * Sınır gelmeyen cihazda sahte hareket YOK: satır 'okunuyor' nabzıyla ve
+   * sabit renkli çapayla durur (dürüst). Kelime-kelime birebir karaoke,
+   * ElevenLabs zaman-damgalı kayıtlar gömülünce her cihazda çalışacak. */
   function play(k, { lang = "en", rate = 0.92, onend = null } = {}) {
     reset(k);
     if (!k.spoken.length) { if (onend) onend(); return; }
     k.playing = true;
+    k.el.classList.add("kara-reading");   // satır düzeyinde "okunuyor" nabzı
 
-    /* okunan kelimelerin tahmini süreleri (uzunluk-ağırlıklı) */
-    const durOf = (w) => {
-      let d = (170 + 60 * w.replace(/[^a-z0-9]/gi, "").length) / rate;
-      if (/[.,;:!?]$/.test(w)) d += 240;
-      return d;
-    };
-
-    let boundarySeen = false;
-
-    /* Mod 1: gerçek kelime sınırı olayları */
     const onboundary = (e) => {
       if (e.name && e.name !== "word") return;
-      if (!boundarySeen) { boundarySeen = true; k.timers.forEach(clearTimeout); k.timers = []; }
+      /* ilk gerçek sınır = sesin gerçekten başladığı an → nabzı bırak, izlemeye geç */
+      if (k.el.classList.contains("kara-reading")) k.el.classList.remove("kara-reading");
       const ci = e.charIndex || 0;
       let si = 0;
       for (let i = 0; i < k.spoken.length; i++) if (k.spoken[i].charStart <= ci) si = i;
@@ -120,14 +119,10 @@ const Karaoke = (() => {
     });
     if (!started) { finish(k, onend); return; }
 
-    /* Mod 2: tahmini şerit (boundary gelmezse devreye zaten girmiş olur) */
-    let t = 60;
-    k.spoken.forEach((sp, si) => {
-      k.timers.push(setTimeout(() => { if (!boundarySeen && k.playing) markUpTo(k, si); }, t));
-      t += durOf(k.words[sp.idx].w);
-    });
-    /* güvenlik: onend kaçarsa tahmini toplamın %60 fazlasında bitir */
-    k.timers.push(setTimeout(() => { if (!boundarySeen && k.playing && !k.done) finish(k, onend); }, t * 1.6 + 800));
+    /* Güvenlik: onend kaçarsa (bazı mobil motorlar) cömert bir üst sınırda
+     * durumu temizle — bu şeridi SÜRMEZ, yalnız takılı kalmayı önler. */
+    const cap = k.spoken.reduce((s, sp) => s + (300 + 70 * k.words[sp.idx].w.length) / rate, 0) + 3000;
+    k.timers.push(setTimeout(() => { if (k.playing && !k.done) finish(k, onend); }, cap));
   }
 
   function stop(k) {

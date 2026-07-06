@@ -524,6 +524,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .kara-word.kara-done { opacity: 1; }
 .kara-word.kara-now { background: var(--accent); color: #fff; }
 .kara-word.kara-silent { opacity: 0.55; }
+/* "okunuyor" nabzı — kelime-sınırı olayı gelmeyen cihazlarda sahte hareket
+ * yerine dürüst bir işaret (satır bir bütün olarak nefes alır) */
+@keyframes kara-breathe { 0%, 100% { opacity: 0.72; } 50% { opacity: 1; } }
+.kara-line.kara-reading { animation: kara-breathe 1.15s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .kara-line.kara-reading { animation: none; opacity: 0.9; } }
 
 /* ---------- adım butonları + hüküm ---------- */
 .step-btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
